@@ -182,7 +182,7 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
                 onTouchEnd={handleTouchEnd}
               >
                 <img
-                  src={currentStep?.image || currentRecipe.image}
+                  src={`${(currentStep?.image || currentRecipe.image)}${(currentStep?.image || currentRecipe.image)?.includes('?') ? '&' : '?'}v=1`}
                   className="w-full h-auto object-contain block transition-opacity duration-300"
                   alt="Step Preview"
                   referrerPolicy="no-referrer"

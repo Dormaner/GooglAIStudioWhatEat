@@ -263,7 +263,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
                   >
                     <div className="relative w-full aspect-video bg-gray-100">
                       <img
-                        src={recipe.image}
+                        src={`${recipe.image}${recipe.image?.includes('?') ? '&' : '?'}v=1`}
                         alt={recipe.name}
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
