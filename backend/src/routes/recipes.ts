@@ -148,7 +148,7 @@ router.post('/', async (req: Request, res: Response) => {
             ];
 
             for (const ing of allIngredients) {
-                // Find or create ingredient
+                // Match Existing or Create New
                 let { data: existingIng } = await supabase
                     .from('ingredients')
                     .select('id')
@@ -164,15 +164,16 @@ router.post('/', async (req: Request, res: Response) => {
                     existingIng = newIng;
                 }
 
-                // Link ingredient to recipe
-                await supabase
-                    .from('recipe_ingredients')
-                    .insert({
-                        recipe_id: recipe.id,
-                        ingredient_id: existingIng.id,
-                        amount: ing.amount,
-                        type: ing.type
-                    });
+                if (existingIng) {
+                    await supabase
+                        .from('recipe_ingredients')
+                        .insert({
+                            recipe_id: recipe.id,
+                            ingredient_id: existingIng.id,
+                            amount: ing.amount,
+                            type: ing.type
+                        });
+                }
             }
         }
 

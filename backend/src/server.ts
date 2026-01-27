@@ -1,14 +1,32 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import cron from 'node-cron';
 import recipesRouter from './routes/recipes.js';
 import ingredientsRouter from './routes/ingredients.js';
 import searchRouter from './routes/search.js';
+import aiRouter from './routes/ai.js';
+import { scrapeXiachufang } from './services/scraper.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Schedule Daily Scrape at 3 AM
+cron.schedule('0 3 * * *', () => {
+    console.log('Running daily scraper job...');
+    scrapeXiachufang();
+});
+
+// Manual Trigger Route
+app.post('/api/scraper/trigger', async (req, res) => {
+    console.log('Manual scraper trigger received');
+    // Run async without waiting
+    scrapeXiachufang();
+    res.json({ message: 'Scraper started in background' });
+});
+
 
 // Middleware
 app.use(cors());

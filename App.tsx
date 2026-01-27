@@ -30,41 +30,52 @@ const App: React.FC = () => {
     setIsCooking(false);
   }, []);
 
-  if (isCooking && selectedRecipe) {
-    return (
-      <CookingMode 
-        recipe={selectedRecipe} 
-        mode={viewMode} 
-        onExit={exitCookingMode} 
-      />
-    );
-  }
-
-  if (selectedRecipe) {
-    return (
-      <RecipeDetail 
-        recipe={selectedRecipe} 
-        mode={viewMode} 
-        setMode={setViewMode} 
-        onBack={handleBack} 
-        onEnterCooking={enterCookingMode}
-      />
-    );
-  }
-
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto bg-white overflow-hidden shadow-2xl relative">
-      <div className="flex-1 overflow-y-auto pb-20 hide-scrollbar">
-        {activeTab === 'what-to-eat' && <WhatToEat onRecipeClick={handleRecipeClick} />}
-        {activeTab === 'what-is-available' && <WhatIsAvailable onRecipeClick={handleRecipeClick} />}
-        {activeTab === 'me' && (
-          <div className="p-8 text-center text-gray-500">
-            <h1 className="text-2xl font-bold text-gray-800 mb-4">我的</h1>
-            <p>个人中心页面开发中...</p>
+      <div className="flex-1 overflow-y-auto pb-20 hide-scrollbar scroll-smooth">
+        {/* Main Tab Views - Keep mounted but hidden when detail is open */}
+        <div className={selectedRecipe ? 'hidden' : 'block h-full'}>
+          {activeTab === 'what-to-eat' && <WhatToEat onRecipeClick={handleRecipeClick} />}
+          {/* Always keep WhatIsAvailable mounted to preserve state */}
+          <div className={activeTab === 'what-is-available' ? 'block' : 'hidden'}>
+            <WhatIsAvailable onRecipeClick={handleRecipeClick} />
+          </div>
+          {activeTab === 'me' && (
+            <div className="p-8 text-center text-gray-500">
+              <h1 className="text-2xl font-bold text-gray-800 mb-4">我的</h1>
+              <p>个人中心页面开发中...</p>
+            </div>
+          )}
+        </div>
+
+        {/* Recipe Detail View - Overlays the main content */}
+        {selectedRecipe && !isCooking && (
+          <div className="absolute inset-0 bg-white z-50 overflow-y-auto">
+            <RecipeDetail
+              recipe={selectedRecipe}
+              mode={viewMode}
+              setMode={setViewMode}
+              onBack={handleBack}
+              onEnterCooking={enterCookingMode}
+            />
+          </div>
+        )}
+
+        {/* Cooking Mode - Full screen overlay */}
+        {isCooking && selectedRecipe && (
+          <div className="absolute inset-0 bg-white z-50">
+            <CookingMode
+              recipe={selectedRecipe}
+              mode={viewMode}
+              onExit={exitCookingMode}
+            />
           </div>
         )}
       </div>
-      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      {!selectedRecipe && !isCooking && (
+        <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+      )}
     </div>
   );
 };

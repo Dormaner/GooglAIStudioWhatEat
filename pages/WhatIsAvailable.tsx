@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
-import { fetchIngredients, fetchRecipes, addNewIngredient, searchBilibiliRecipes } from '../services/api';
+import { fetchIngredients, fetchRecipes, addNewIngredient, searchByIngredients } from '../services/api';
 import { Recipe } from '../types';
 import AddIngredientModal from '../components/AddIngredientModal';
 
@@ -85,46 +85,15 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
       setLoading(true);
       setDisplayedRecipes([]);
 
-      const results = await searchBilibiliRecipes(selectedIngredients);
+      // Switch to Local DB Search for Xiachufang recipes
+      // strict=false means fuzzy match (at least one ingredient)
+      // matchMode state controls how we filter the RESULTS
 
-      // Post-process results for Strict/Fuzzy and Missing Ingredients
-      const processedResults = results.map(recipe => {
-        const title = recipe.name;
-        const knownIngredients = getAllKnownIngredients();
+      const results = await searchByIngredients(selectedIngredients, matchMode === 'strict');
+      setDisplayedRecipes(results);
 
-        // Scan title for missing ingredients
-        const missing = knownIngredients.filter(known => {
-          // Check if title mentions this known ingredient
-          const mentioned = containsIngredient(title, known);
-
-          // Check if we actually HAVE it (or a synonym of it)
-          const haveIt = selectedIngredients.some(selected =>
-            selected === known ||
-            (SYNONYMS[selected] && SYNONYMS[selected].includes(known)) ||
-            (SYNONYMS[known] && SYNONYMS[known].includes(selected))
-          );
-
-          return mentioned && !haveIt;
-        });
-
-        return {
-          ...recipe,
-          missingIngredients: missing
-        };
-      });
-
-      // Filter based on Match Mode
-      let finalResults = processedResults;
-
-      if (matchMode === 'strict') {
-        // Strict Mode Rule: 
-        // 1. MUST NOT lack any ingredients (missingIngredients.length === 0).
-        finalResults = finalResults.filter(r => r.missingIngredients.length === 0);
-      }
-
-      setDisplayedRecipes(finalResults);
     } catch (err) {
-      console.error('Bilibili search failed', err);
+      console.error('Local search failed', err);
     } finally {
       setLoading(false);
     }
@@ -276,7 +245,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-10 gap-4 text-amber-500/80">
               <Loader2 className="animate-spin" size={40} />
-              <span className="text-sm font-bold animate-pulse">正在B站寻找美味...</span>
+              <span className="text-sm font-bold animate-pulse">正在厨房里翻箱倒柜...</span>
             </div>
           ) : displayedRecipes.length > 0 ? (
             <>
