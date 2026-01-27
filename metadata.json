@@ -1,0 +1,7 @@
+{
+  "name": "Cooking Assistant - What to Eat?",
+  "description": "A comprehensive cooking guide app that helps you decide what to eat based on available ingredients, featuring immersive video and graphic cooking modes with voice control support.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
