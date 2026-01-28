@@ -1,7 +1,9 @@
 
 import React, { useState } from 'react';
-import { X, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 import AddIngredientModal from './AddIngredientModal';
+import IngredientSection from './IngredientSection';
+import VariantSelectionModal from './VariantSelectionModal';
 
 interface KitchenPantryProps {
     isOpen: boolean;
@@ -16,45 +18,28 @@ interface KitchenPantryProps {
 const KitchenPantry: React.FC<KitchenPantryProps> = ({
     isOpen, onClose, ingredients, selectedIngredients, onToggleIngredient, onAddIngredient, onSearch
 }) => {
-    const [showKitchenware, setShowKitchenware] = useState(true);
+    // State needed for Add Modal
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [addCategory, setAddCategory] = useState<'condiment' | 'tool' | 'staple'>('condiment');
 
+    // State needed for Variant Selection
+    const [variantModalOpen, setVariantModalOpen] = useState(false);
+    const [activeGroup, setActiveGroup] = useState<{ name: string, variants: any[] } | null>(null);
+
     if (!isOpen) return null;
 
-    const handleOpenAdd = (category: 'condiment' | 'tool' | 'staple') => {
-        setAddCategory(category);
+    const handleOpenAdd = (category: string) => {
+        // Map display title back to internal category
+        if (category === '主食') setAddCategory('staple');
+        else if (category === '厨具设备') setAddCategory('tool');
+        else setAddCategory('condiment');
         setIsAddModalOpen(true);
     };
 
-    const IngredientGroup = ({ title, items, category }: { title: string, items: any[], category: 'condiment' | 'tool' | 'staple' }) => (
-        <div className="mb-6">
-            <div className="flex justify-between items-center mb-3">
-                <h4 className="font-bold text-gray-700">{title}</h4>
-                <button
-                    onClick={() => handleOpenAdd(category)}
-                    className="text-xs text-blue-500 flex items-center gap-1 font-medium bg-blue-50 px-2 py-1 rounded-full"
-                >
-                    <Plus size={12} /> 自定义
-                </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-                {items.map((item: any) => (
-                    <button
-                        key={item.name}
-                        onClick={() => onToggleIngredient(item.name)}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all border
-              ${selectedIngredients.includes(item.name)
-                                ? 'bg-orange-100 text-orange-700 border-transparent shadow-sm'
-                                : 'bg-gray-50 text-gray-600 border-gray-100'}`}
-                    >
-                        <span>{item.icon}</span>
-                        {item.name}
-                    </button>
-                ))}
-            </div>
-        </div>
-    );
+    const openVariantModal = (group: any) => {
+        setActiveGroup(group);
+        setVariantModalOpen(true);
+    };
 
     return (
         <>
@@ -68,11 +53,39 @@ const KitchenPantry: React.FC<KitchenPantryProps> = ({
                         </button>
                     </div>
 
-                    <IngredientGroup title="主食" items={ingredients.staples} category="staple" />
-                    <IngredientGroup title="常用调料" items={ingredients.condiments} category="condiment" />
+                    <IngredientSection
+                        title="主食"
+                        icon="🍚"
+                        items={ingredients.staples}
+                        colorClass="bg-amber-100 text-amber-700"
+                        selectedIngredients={selectedIngredients}
+                        onToggle={onToggleIngredient}
+                        onOpenAddModal={handleOpenAdd}
+                        onOpenVariantModal={openVariantModal}
+                    />
+
+                    <IngredientSection
+                        title="常用调料"
+                        icon="🧂"
+                        items={ingredients.condiments}
+                        colorClass="bg-blue-100 text-blue-700"
+                        selectedIngredients={selectedIngredients}
+                        onToggle={onToggleIngredient}
+                        onOpenAddModal={handleOpenAdd}
+                        onOpenVariantModal={openVariantModal}
+                    />
 
                     <div className="border-t border-gray-100 my-4 pt-4">
-                        <IngredientGroup title="厨具设备" items={ingredients.kitchenware} category="tool" />
+                        <IngredientSection
+                            title="厨具设备"
+                            icon="🍳"
+                            items={ingredients.kitchenware}
+                            colorClass="bg-gray-100 text-gray-700"
+                            selectedIngredients={selectedIngredients}
+                            onToggle={onToggleIngredient}
+                            onOpenAddModal={handleOpenAdd}
+                            onOpenVariantModal={openVariantModal}
+                        />
                     </div>
                 </div>
 
@@ -101,6 +114,14 @@ const KitchenPantry: React.FC<KitchenPantryProps> = ({
                     setIsAddModalOpen(false);
                 }}
                 category={addCategory === 'condiment' ? '调料' : (addCategory === 'staple' ? '主食' : '厨具')}
+            />
+
+            <VariantSelectionModal
+                isOpen={variantModalOpen}
+                onClose={() => setVariantModalOpen(false)}
+                group={activeGroup}
+                selectedIngredients={selectedIngredients}
+                onToggle={onToggleIngredient}
             />
         </>
     );

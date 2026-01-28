@@ -1,10 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Loader2 } from 'lucide-react';
-import { fetchIngredients, fetchRecipes, addNewIngredient, searchByIngredients } from '../services/api';
+import { Loader2, Plus } from 'lucide-react';
+import { fetchIngredients, addNewIngredient, searchByIngredients } from '../services/api';
 import { Recipe } from '../types';
 import KitchenPantry from '../components/KitchenPantry';
 import AddIngredientModal from '../components/AddIngredientModal';
+import IngredientSection from '../components/IngredientSection';
+import VariantSelectionModal from '../components/VariantSelectionModal';
 
 interface WhatIsAvailableProps {
   onRecipeClick: (recipe: Recipe) => void;
@@ -14,6 +16,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>(['土豆', '胡萝卜', '鸡蛋']);
   const [ingredients, setIngredients] = useState<any>({ vegetables: [], meats: [], staples: [], condiments: [], kitchenware: [] });
   const [showPantry, setShowPantry] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
   const [displayedRecipes, setDisplayedRecipes] = useState<Recipe[]>([]);
 
@@ -38,44 +41,6 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
     } catch (error) {
       console.error('Error loading data:', error);
     }
-  };
-
-  // Helper: Synonym Mapping for better matching
-  const SYNONYMS: Record<string, string[]> = {
-    '西红柿': ['番茄'],
-    '番茄': ['西红柿'],
-    '土豆': ['马铃薯', '洋芋'],
-    '马铃薯': ['土豆', '洋芋'],
-    '洋芋': ['土豆', '马铃薯'],
-    '花菜': ['花椰菜'],
-    '西兰花': ['花椰菜'],
-    '包菜': ['卷心菜', '洋白菜', '圆白菜'],
-    '大头菜': ['包菜', '卷心菜'],
-    '菠萝': ['凤梨'],
-    '鸡肉': ['鸡胸', '鸡腿', '鸡翅', '全鸡'],
-    '猪肉': ['五花肉', '瘦肉', '里脊', '排骨', '猪蹄'],
-    '牛肉': ['牛排', '牛腩', '肥牛'],
-    '鸡蛋': ['蛋'],
-    '青椒': ['甜椒', '辣椒']
-  };
-
-  // Helper to check if text contains ingredient (handling synonyms)
-  const containsIngredient = (text: string, ingredient: string) => {
-    if (text.includes(ingredient)) return true;
-    const aliases = SYNONYMS[ingredient];
-    if (aliases) {
-      return aliases.some(alias => text.includes(alias));
-    }
-    return false;
-  };
-
-  // Helper to get all known ingredient names for scanning
-  const getAllKnownIngredients = () => {
-    return [
-      ...ingredients.vegetables.map((i: any) => i.name),
-      ...ingredients.meats.map((i: any) => i.name),
-      ...ingredients.staples.map((i: any) => i.name)
-    ];
   };
 
   // Manual search trigger
@@ -105,13 +70,6 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
       setLoading(false);
     }
   };
-
-  // ... (omitted sections)
-
-  // Remove the toggle UI entirely
-
-
-
 
   const toggleIngredient = (name: string) => {
     setSelectedIngredients(prev =>
@@ -166,35 +124,14 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
     }
   };
 
-  const IngredientSection = ({ title, icon, items, colorClass }: { title: string, icon: string, items: any[], colorClass: string }) => (
-    <div className="mb-8">
-      <div className="flex items-center gap-2 mb-4 justify-center">
-        <span className="text-xl">{icon}</span>
-        <h3 className="text-lg font-bold text-gray-800">{title}</h3>
-      </div>
-      <div className="flex flex-wrap gap-2 justify-center">
-        {items.map((item: any) => (
-          <button
-            key={item.name}
-            onClick={() => toggleIngredient(item.name)}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all border
-              ${selectedIngredients.includes(item.name)
-                ? `${colorClass} border-transparent shadow-sm scale-105`
-                : 'bg-white text-gray-600 border-gray-200'}`}
-          >
-            <span>{item.icon}</span>
-            {item.name}
-          </button>
-        ))}
-        <button
-          onClick={() => openAddModal(title)}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-orange-50 text-orange-400 border border-orange-100 border-dashed hover:bg-orange-100 transition-colors"
-        >
-          <Plus size={16} />
-        </button>
-      </div>
-    </div>
-  );
+  // Variant Selection Modal State
+  const [variantModalOpen, setVariantModalOpen] = useState(false);
+  const [activeGroup, setActiveGroup] = useState<{ name: string, variants: any[] } | null>(null);
+
+  const openVariantModal = (group: any) => {
+    setActiveGroup(group);
+    setVariantModalOpen(true);
+  };
 
   return (
     <div className="px-5 pt-10 bg-[#f8f9fa] min-h-full pb-20">
@@ -206,7 +143,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
         </button>
       </div>
 
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-end mb-4 gap-2">
         <button
           onClick={() => setShowPantry(true)}
           className="flex items-center gap-1 bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-full text-sm font-semibold shadow-sm hover:bg-gray-50 transition-all"
@@ -215,8 +152,26 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
         </button>
       </div>
 
-      <IngredientSection title="菜菜们" icon="🥬" items={ingredients.vegetables} colorClass="bg-green-100 text-green-700" />
-      <IngredientSection title="肉肉们" icon="🥩" items={ingredients.meats} colorClass="bg-red-100 text-red-700" />
+      <IngredientSection
+        title="菜菜们"
+        icon="🥬"
+        items={ingredients.vegetables}
+        colorClass="bg-green-100 text-green-700"
+        selectedIngredients={selectedIngredients}
+        onToggle={toggleIngredient}
+        onOpenAddModal={openAddModal}
+        onOpenVariantModal={openVariantModal}
+      />
+      <IngredientSection
+        title="肉肉们"
+        icon="🥩"
+        items={ingredients.meats}
+        colorClass="bg-red-100 text-red-700"
+        selectedIngredients={selectedIngredients}
+        onToggle={toggleIngredient}
+        onOpenAddModal={openAddModal}
+        onOpenVariantModal={openVariantModal}
+      />
 
       <KitchenPantry
         isOpen={showPantry}
@@ -226,6 +181,15 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
         onToggleIngredient={toggleIngredient}
         onAddIngredient={(name, cat, icon) => handleAddIngredient(name, icon, cat)}
         onSearch={handleSearch}
+      />
+
+      {/* Variant Selection Modal - Reusable Component */}
+      <VariantSelectionModal
+        isOpen={variantModalOpen}
+        onClose={() => setVariantModalOpen(false)}
+        group={activeGroup}
+        selectedIngredients={selectedIngredients}
+        onToggle={toggleIngredient}
       />
 
       <div className={`mt-10 mb-6 transition-opacity duration-300 ${showPantry ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
