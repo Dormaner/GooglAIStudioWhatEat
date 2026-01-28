@@ -3,6 +3,11 @@ import { supabase } from '../config/supabase.js';
 
 const router = Router();
 
+// GET /api/ingredients/debug-status - Check if v2 code is active
+router.get('/debug-status', (req, res) => {
+    res.json({ version: 'v3-final-fix', timestamp: new Date().toISOString() });
+});
+
 // GET /api/ingredients - Get all ingredients from library
 router.get('/', async (req: Request, res: Response) => {
     try {
@@ -67,6 +72,7 @@ router.get('/user-ingredients', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
     try {
         const { name, category, icon } = req.body;
+        console.log(`[POST /ingredients] Request received for: ${name} (Category: ${category}) - v2 handler`);
 
         if (!name || !category) {
             return res.status(400).json({ error: 'Name and category are required' });
@@ -75,15 +81,11 @@ router.post('/', async (req: Request, res: Response) => {
         // Check if exists
         const { data: existing } = await supabase
             .from('ingredients')
-            .select('id')
+            .select('id, category')
             .eq('name', name)
             .single();
 
-        if (existing) {
-            return res.status(400).json({ error: 'Ingredient already exists' });
-        }
-
-        // Determine default icon if not provided
+        // Determine default icon if not provided/needed
         let defaultIcon = icon;
         if (!defaultIcon) {
             switch (category) {
@@ -95,6 +97,22 @@ router.post('/', async (req: Request, res: Response) => {
                 case 'tool': defaultIcon = '🍳'; break;
                 default: defaultIcon = '🍽️';
             }
+        }
+
+        if (existing) {
+            // If exists, update its category to the requested one (claiming it from 'other' or fixing a mistake)
+            // Only update if category is different to avoid unnecessary writes, but updating icon is good too if provided
+            const { data: updated, error: updateError } = await supabase
+                .from('ingredients')
+                .update({ category, icon: defaultIcon })
+                .eq('id', existing.id)
+                .select()
+                .single();
+
+            if (updateError) throw updateError;
+
+            // Return successfully
+            return res.status(200).json(updated);
         }
 
         const { data: newIngredient, error } = await supabase

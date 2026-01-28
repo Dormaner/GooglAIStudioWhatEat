@@ -136,14 +136,33 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
     setIsModalOpen(true);
   };
 
-  const handleAddIngredient = async (name: string, icon?: string) => {
+  const handleAddIngredient = async (name: string, icon?: string, overrideCategory?: string) => {
     try {
-      await addNewIngredient(name, modalCategory, icon);
+      // Manual mapping mainly for when KitchenPantry passes Chinese keys
+      const categoryMap: Record<string, string> = {
+        '蔬菜': 'vegetable',
+        '肉类': 'meat',
+        '主食': 'staple',
+        '调料': 'condiment',
+        '厨具': 'tool'
+      };
+
+      let finalCategory = overrideCategory || modalCategory;
+      if (categoryMap[finalCategory]) {
+        finalCategory = categoryMap[finalCategory];
+      }
+
+      // Fallbacks
+      if (finalCategory === '调料') finalCategory = 'condiment';
+      if (finalCategory === '厨具') finalCategory = 'tool';
+      if (finalCategory === '主食') finalCategory = 'staple';
+
+      await addNewIngredient(name, finalCategory, icon);
       await loadData(); // Refresh list
       setIsModalOpen(false);
     } catch (error) {
       console.error('Failed to add ingredient:', error);
-      alert('添加失败，可能该食材已存在');
+      alert(`添加失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   };
 
@@ -205,7 +224,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
         ingredients={ingredients}
         selectedIngredients={selectedIngredients}
         onToggleIngredient={toggleIngredient}
-        onAddIngredient={(name, cat, icon) => handleAddIngredient(name, icon)}
+        onAddIngredient={(name, cat, icon) => handleAddIngredient(name, icon, cat)}
         onSearch={handleSearch}
       />
 
