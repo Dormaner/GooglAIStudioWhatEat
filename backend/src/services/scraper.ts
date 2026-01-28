@@ -11,29 +11,39 @@ export const scrapeXiachufang = async () => {
     try {
         // 1. Get Popular Recipes IDs from Explore Page
         // We use Desktop UA for this as it lists more recipes clearly
-        const { data: exploreHtml } = await axios.get('https://www.xiachufang.com/explore/', {
-            headers: { 'User-Agent': UA_DESKTOP }
-        });
-
-        const $explore = cheerio.load(exploreHtml as string);
+        // Fetch pages 1 to 5 to ensure we get ~100 recipes
         const recipeLinks: string[] = [];
 
-        // Selector for recipe links on explore page (usually in .normal-recipe-list or similar)
-        // We look for links with /recipe/ digits
-        $explore('a[href^="/recipe/"]').each((_: any, el: any) => {
-            const href = $explore(el).attr('href');
-            if (href) {
-                // Extract ID
-                const match = href.match(/\/recipe\/(\d+)\//);
-                if (match) {
-                    recipeLinks.push(match[1]);
-                }
+        for (let page = 1; page <= 5; page++) {
+            console.log(`[Scraper] Fetching Explore Page ${page}...`);
+            try {
+                const { data: exploreHtml } = await axios.get(`https://www.xiachufang.com/explore/?page=${page}`, {
+                    headers: { 'User-Agent': UA_DESKTOP }
+                });
+
+                const $explore = cheerio.load(exploreHtml as string);
+
+                // Selector for recipe links
+                $explore('a[href^="/recipe/"]').each((_: any, el: any) => {
+                    const href = $explore(el).attr('href');
+                    if (href) {
+                        const match = href.match(/\/recipe\/(\d+)\//);
+                        if (match) {
+                            recipeLinks.push(match[1]);
+                        }
+                    }
+                });
+
+                // Polite delay between pages
+                await new Promise(r => setTimeout(r, 1000));
+            } catch (err) {
+                console.warn(`[Scraper] Failed to fetch page ${page}`);
             }
-        });
+        }
 
         // Dedup IDs
-        const uniqueIds = [...new Set(recipeLinks)].slice(0, 100); // Increased to 100 for testing
-        console.log(`[Scraper] Found ${uniqueIds.length} recipes to process.`);
+        const uniqueIds = [...new Set(recipeLinks)].slice(0, 100);
+        console.log(`[Scraper] Found ${uniqueIds.length} unique recipes to process.`);
 
         for (const id of uniqueIds) {
             await processRecipe(id);

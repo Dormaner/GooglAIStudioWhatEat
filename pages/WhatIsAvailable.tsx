@@ -263,7 +263,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
                   >
                     <div className="relative w-full aspect-video bg-gray-100">
                       <img
-                        src={`${recipe.image}${recipe.image?.includes('?') ? '&' : '?'}v=1`}
+                        src={`http://localhost:3001/api/image?url=${encodeURIComponent(recipe.image || '')}`}
                         alt={recipe.name}
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
@@ -305,7 +305,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
           category={modalCategory}
         />
       </div>
-    </div>
+    </div >
   );
 };
 

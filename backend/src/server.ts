@@ -6,6 +6,7 @@ import recipesRouter from './routes/recipes.js';
 import ingredientsRouter from './routes/ingredients.js';
 import searchRouter from './routes/search.js';
 import aiRouter from './routes/ai.js';
+import imageRouter from './routes/image.js';
 import { scrapeXiachufang } from './services/scraper.js';
 
 dotenv.config();
@@ -48,6 +49,7 @@ app.get('/health', (req, res) => {
 app.use('/api/recipes', recipesRouter);
 app.use('/api/ingredients', ingredientsRouter);
 app.use('/api/search', searchRouter);
+app.use('/api/image', imageRouter); // Register here
 
 // 404 handler
 app.use((req, res) => {
