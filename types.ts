@@ -5,6 +5,9 @@ export interface Recipe {
   image: string;
   link?: string;
   missingIngredients?: string[];
+  likes?: number;
+  isCollected?: boolean;
+  cookedCount?: number; // Local state
   ingredients: {
     main: { name: string; amount: string; status?: 'missing' | 'stocked' }[];
     condiments: { name: string; amount: string; status?: 'missing' | 'stocked' }[];

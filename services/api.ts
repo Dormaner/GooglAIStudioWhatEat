@@ -119,9 +119,35 @@ export const searchBilibiliRecipes = async (ingredients: string[]): Promise<Reci
     return response.data;
 };
 
-export const analyzeRecipe = async (bvid: string): Promise<any> => {
-    const response = await api.post('/api/ai/analyze', { bvid });
-    return response.data;
+export const analyzeRecipe = async (bvid: string) => {
+    const response = await fetch(`${API_URL}/analyze/${bvid}`);
+    return response.json();
+};
+
+export const toggleFavorite = async (recipeId: string) => {
+    const response = await fetch(`${API_URL}/recipes/${recipeId}/favorite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: 'default-user' })
+    });
+    return response.json();
+};
+
+export const updateRecipeInsight = async (recipeId: string, insight: string) => {
+    const response = await fetch(`${API_URL}/recipes/${recipeId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ insight })
+    });
+    return response.json();
+};
+
+export const incrementCookedCount = async (recipeId: string) => {
+    const response = await fetch(`${API_URL}/recipes/${recipeId}/cooked`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+    });
+    return response.json();
 };
 
 export default api;

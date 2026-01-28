@@ -17,10 +17,112 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
   const [currentRecipe, setCurrentRecipe] = useState<Recipe>(recipe);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
-  // When props recipe changes, update state
+  // Interaction States
+  // REMOVED: likes/Heart state
+  const [isCollected, setIsCollected] = useState(recipe.isCollected || false);
+  const [cookedCount, setCookedCount] = useState(0);
+
+  // Edit Insight State
+  const [isEditingInsight, setIsEditingInsight] = useState(false);
+  const [insightText, setInsightText] = useState(recipe.insight || '');
+  const [isSavingInsight, setIsSavingInsight] = useState(false); // Loading state for save
+
+  // Load local state (Cooked Count)
   useEffect(() => {
+    const localCount = parseInt(localStorage.getItem(`cooked_count_${recipe.id}`) || '0');
+    setCookedCount(localCount);
+  }, [recipe.id]);
+
+  // Sync props AND Fetch latest data (Fix for persistence)
+  useEffect(() => {
+    // 1. Initial Sync from props
     setCurrentRecipe(recipe);
-  }, [recipe]);
+    setIsCollected(recipe.isCollected || false);
+    setInsightText(recipe.insight || '');
+
+    // 2. Fetch fresh data from API to ensure Insight is up-to-date
+    const fetchFreshData = async () => {
+      try {
+        const { fetchRecipeById } = await import('../services/api');
+        const freshRecipe = await fetchRecipeById(recipe.id);
+        if (freshRecipe) {
+          setCurrentRecipe(freshRecipe);
+          setInsightText(freshRecipe.insight || '');
+          setIsCollected(freshRecipe.isCollected || false);
+        }
+      } catch (e) {
+        console.error("Failed to fetch fresh recipe data", e);
+      }
+    };
+    fetchFreshData();
+
+  }, [recipe.id]); // Only re-run if recipe ID changes (page load)
+
+  const handleToggleFavorite = async () => {
+    // Optimistic Update: Star Toggle ONLY
+    const newState = !isCollected;
+    setIsCollected(newState);
+
+    try {
+      const { toggleFavorite } = await import('../services/api');
+      await toggleFavorite(recipe.id);
+    } catch (e) {
+      // Revert
+      setIsCollected(!newState);
+    }
+  };
+
+  const handleIncrementCooked = async () => {
+    // 1. Update Local Personal Count
+    const newCount = cookedCount + 1;
+    setCookedCount(newCount);
+    localStorage.setItem(`cooked_count_${recipe.id}`, newCount.toString());
+
+    // 2. Update Global Cooked Count (Invisible to user now, but still recorded)
+    try {
+      const { incrementCookedCount } = await import('../services/api');
+      await incrementCookedCount(recipe.id);
+    } catch (e) {
+      // Ignore
+    }
+  };
+
+  const handleSaveInsight = async () => {
+    // Prevent double submissions
+    if (isSavingInsight) return;
+
+    setIsSavingInsight(true);
+
+    const updatedRecipe = { ...currentRecipe, insight: insightText };
+    setCurrentRecipe(updatedRecipe); // Optimistic UI update
+
+    try {
+      const { updateRecipeInsight } = await import('../services/api');
+      await updateRecipeInsight(recipe.id, insightText);
+      setIsEditingInsight(false); // Only close on success or after attempt
+    } catch (e) {
+      console.error("Failed to save insight", e);
+      // Maybe show toast here?
+    } finally {
+      setIsSavingInsight(false);
+    }
+  };
+
+  const handleSafeBack = async () => {
+    // If we are editing, force a save
+    if (isEditingInsight) {
+      await handleSaveInsight();
+    }
+    onBack();
+  };
+
+  const handleSafeCooking = async () => {
+    // If we are editing, force a save
+    if (isEditingInsight) {
+      await handleSaveInsight();
+    }
+    onEnterCooking();
+  };
 
   const isBilibili = recipe.link?.includes('bilibili.com');
   const isXiachufang = recipe.link?.includes('xiachufang.com');
@@ -34,6 +136,8 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
       // Trigger AI Analysis if it's a Bilibili recipe and no steps exist yet
       try {
         setAnalyzing(true);
+        // Use the imported analyzeRecipe directly
+        const { analyzeRecipe } = await import('../services/api');
         const analysisResult = await analyzeRecipe(recipe.id.replace('bili-', ''));
 
         // Merge AI result with current recipe
@@ -103,52 +207,80 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
     <div className="flex flex-col h-screen max-w-md mx-auto bg-white overflow-hidden shadow-2xl relative">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-gray-50 bg-white sticky top-0 z-50">
-        <button onClick={onBack} className="p-2 -ml-2">
+        <button onClick={handleSafeBack} className="p-2 -ml-2">
           <ChevronLeft size={28} className="text-gray-800" />
         </button>
         <h2 className="text-xl font-bold text-gray-800 flex-1 ml-4 line-clamp-1">{currentRecipe.name}</h2>
-        <div className="flex items-center gap-2">
-          {/* Only show "Video Mode" toggle if it IS a Bilibili video. For Xiachufang, we default to graphic. */}
-          {isBilibili && (
-            <button
-              onClick={handleModeSwitch}
-              className={`px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-1 transition-all ${mode === 'graphic' ? 'bg-purple-100 text-purple-600' : 'bg-blue-50 text-blue-600'}`}
-            >
-              {mode === 'video' ? '智能图文' : '返回视频'}
-              {mode === 'video' && <Sparkles size={14} />}
-            </button>
-          )}
-          {/* If Xiachufang, show explicit "Source" button */}
-          {isXiachufang && (
-            <a
-              href={currentRecipe.link}
-              target="_blank"
-              rel="noreferrer"
-              className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full text-xs font-bold flex items-center gap-1"
-            >
-              <ExternalLink size={12} /> 原网页
-            </a>
-          )}
-          <Heart size={24} className="text-gray-400" />
+        <div className="flex items-center gap-3">
+
+          {/* Cooked Count (Pot) */}
+          <button onClick={handleIncrementCooked} className="flex flex-col items-center group active:scale-95 transition-transform" title="记录烹饪次数">
+            <div className="relative">
+              <CookingPot size={22} className={`${cookedCount > 0 ? 'text-orange-500' : 'text-gray-400'} transition-colors`} />
+              {cookedCount > 0 && <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full border border-white">{cookedCount}</span>}
+            </div>
+          </button>
+
+          {/* Collect (Star) */}
+          <button onClick={handleToggleFavorite} className="active:scale-95 transition-transform" title="收藏到我的菜谱">
+            <Star size={24} className={`${isCollected ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'} transition-colors`} />
+          </button>
+
+          {/* REMOVED: Heart Icon */}
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto pb-24 hide-scrollbar">
-        {/* Cooking Insight */}
-        {currentRecipe.insight && (
-          <div className="m-5 p-4 bg-orange-50 rounded-2xl border border-orange-100 relative">
-            <div className="absolute top-4 left-4 text-orange-400">
-              <span className="text-lg">💡</span>
-            </div>
-            <div className="flex justify-between items-start mb-2 ml-7">
-              <h3 className="font-bold text-orange-600">我的烹饪心得</h3>
-              <Edit3 size={16} className="text-gray-400" />
-            </div>
-            <p className="text-gray-600 text-sm leading-relaxed ml-7">{currentRecipe.insight}</p>
+        {/* Cooking Insight - Editable */}
+        <div className="m-5 p-4 bg-orange-50 rounded-2xl border border-orange-100 relative group transition-colors hover:border-orange-200">
+          <div className="absolute top-4 left-4 text-orange-400">
+            <span className="text-lg">💡</span>
           </div>
-        )}
 
-        {/* Media Player Area - Enlarged and No Cropping for Graphic Mode */}
+          {isEditingInsight ? (
+            // Edit Mode
+            <div className="ml-7">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-bold text-orange-600">编辑心得</h3>
+                <button
+                  onClick={handleSaveInsight}
+                  disabled={isSavingInsight}
+                  className="text-green-600 text-xs font-bold px-3 py-1 bg-green-100 rounded-full flex items-center gap-1"
+                >
+                  {isSavingInsight ? (
+                    <>
+                      <Loader2 size={10} className="animate-spin" />
+                      保存中...
+                    </>
+                  ) : "保存"}
+                </button>
+              </div>
+              <textarea
+                value={insightText}
+                onChange={(e) => setInsightText(e.target.value)}
+                // Removed onBlur to avoid race conditions with Save button
+                className="w-full text-sm text-gray-700 bg-white border border-orange-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-orange-300 min-h-[80px]"
+                placeholder="写下你的烹饪心得..."
+                autoFocus
+              />
+            </div>
+          ) : (
+            // View Mode
+            <div className="ml-7">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-bold text-orange-600">我的烹饪心得</h3>
+                <button onClick={() => setIsEditingInsight(true)} className="p-1 rounded-full hover:bg-orange-100 text-gray-400 hover:text-orange-500 transition-colors">
+                  <Edit3 size={16} />
+                </button>
+              </div>
+              <div className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap min-h-[20px]" onClick={() => setIsEditingInsight(true)}>
+                {currentRecipe.insight || '暂无心得，点击编辑添加...'}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Media Player Area */}
         <div className={`mb-4 relative group ${(mode === 'video' && isBilibili) ? 'mx-5 rounded-2xl aspect-video bg-black shadow-lg overflow-hidden' : 'w-full'}`}>
           {analyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50/90 gap-4 text-purple-600 z-10 transition-all h-64">
@@ -174,7 +306,7 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
             // Graphic Mode (Default for Xiachufang)
             <div className="flex flex-col">
 
-              {/* Image Section - Full Width, Natural Aspect Ratio with Swipe Support */}
+              {/* Image Section */}
               <div
                 className="w-full bg-gray-50 relative"
                 onTouchStart={handleTouchStart}
@@ -189,14 +321,14 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
                   draggable={false}
                 />
 
-                {/* Swipe hint overlay (fades out) */}
+                {/* Swipe hint overlay */}
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-between px-2 opacity-0 group-hover:opacity-30 transition-opacity">
                   <ChevronLeft size={32} className="text-gray-400" />
                   <ChevronRight size={32} className="text-gray-400" />
                 </div>
               </div>
 
-              {/* Step Navigation Section - MOVED BELOW IMAGE, Buttonless */}
+              {/* Step Navigation Section */}
               <div className="p-5 bg-white border-b border-gray-100 min-h-[150px]">
                 {/* Only show steps if we have them */}
                 {currentRecipe.steps && currentRecipe.steps.length > 0 ? (
@@ -206,7 +338,11 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
                       <span className="text-xs text-gray-400 font-medium">{currentStepIndex + 1} / {currentRecipe.steps.length}</span>
                     </div>
 
-                    <h3 className="text-lg font-bold text-gray-800">{currentStep?.title || '准备开始'}</h3>
+                    {/* Only show Title if it's MEANINGFUL (longer than 5 chars or doesn't start with "步骤") */}
+                    {currentStep?.title && !currentStep.title.startsWith('步骤') && (
+                      <h3 className="text-lg font-bold text-gray-800">{currentStep.title}</h3>
+                    )}
+
                     <p className="text-base text-gray-600 leading-relaxed">
                       {currentStep?.description || '暂无步骤详情'}
                     </p>
@@ -251,7 +387,6 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
               </div>
             ))}
 
-            {/* Show message if no ingredients found */}
             {(!currentRecipe.ingredients?.main || currentRecipe.ingredients.main.length === 0) && (
               <div className="col-span-2 text-center py-4 text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200 text-xs">
                 {analyzing ? '正在识别食材...' : '未识别到主料信息'}
@@ -261,10 +396,10 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
         </div>
       </div>
 
-      {/* Sticky Bottom Button - Only for Video/Bilibili recipes or if we want users to cook along */}
+      {/* Sticky Bottom Button */}
       <div className="absolute bottom-6 left-0 right-0 px-10 pointer-events-none">
         <button
-          onClick={onEnterCooking}
+          onClick={handleSafeCooking}
           className="w-full bg-blue-50 text-blue-600 font-extrabold py-4 rounded-full flex items-center justify-center gap-2 shadow-xl shadow-blue-100 border border-blue-100 pointer-events-auto active:scale-95 transition-all"
         >
           <CookingPot size={24} />
