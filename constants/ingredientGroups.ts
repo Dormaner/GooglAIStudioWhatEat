@@ -224,14 +224,23 @@ export const groupIngredients = (ingredients: any[]) => {
         }
     });
 
-    // Post-process: Sort variants inside groups
+    // Post-process: 
+    // 1. Flatten single-item groups (User Request: Don't group if only 1 item)
+    // 2. Sort variants inside remaining groups
     groups.forEach(g => {
-        // Sort variants: exact match first, then by length
-        g.variants.sort((a, b) => {
-            if (a.name === g.name) return -1;
-            if (b.name === g.name) return 1;
-            return a.name.length - b.name.length;
-        });
+        if (g.variants.length === 1) {
+            // Flatten: Promote the single variant to be the "Group" itself
+            g.isGroup = false;
+            g.name = g.variants[0].name;
+            g.icon = g.variants[0].icon;
+        } else {
+            // Sort variants: exact match first, then by length
+            g.variants.sort((a, b) => {
+                if (a.name === g.name) return -1;
+                if (b.name === g.name) return 1;
+                return a.name.length - b.name.length;
+            });
+        }
     });
 
     return groups;

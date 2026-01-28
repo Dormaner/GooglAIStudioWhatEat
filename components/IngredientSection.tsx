@@ -27,51 +27,22 @@ const IngredientSection: React.FC<IngredientSectionProps> = ({
     defaultExpanded = false
 }) => {
     const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+    const [expandedSubGroups, setExpandedSubGroups] = useState<Set<string>>(new Set());
 
     // Memoize grouping
     const groupedItems = React.useMemo(() => groupIngredients(items), [items]);
 
-    const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-    const isLongPress = useRef(false);
-
-    const handleMouseDown = (group: any) => {
-        if (isExpanded) return;
-        isLongPress.current = false;
-        longPressTimer.current = setTimeout(() => {
-            isLongPress.current = true;
-            onOpenVariantModal(group);
-        }, 600);
-    };
-
-    const handleMouseUp = (group: any) => {
-        if (longPressTimer.current) {
-            clearTimeout(longPressTimer.current);
-            longPressTimer.current = null;
-        }
-
-        if (isLongPress.current) return; // Already handled by timer
-
-        // Normal Click Logic
-        if (!isExpanded) {
-            // Collapsed Mode: Click Group Header
-            if (group.isGroup) {
-                // If any variant selected, deselect all. Else select primary.
-                const anySelected = group.variants.some((v: any) => selectedIngredients.includes(v.name));
-                if (anySelected) {
-                    group.variants.forEach((v: any) => {
-                        if (selectedIngredients.includes(v.name)) onToggle(v.name);
-                    });
-                } else {
-                    onToggle(group.variants[0].name);
-                }
+    const toggleSubGroup = (groupName: string) => {
+        setExpandedSubGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(groupName)) {
+                next.delete(groupName);
             } else {
-                onToggle(group.name);
+                next.add(groupName);
             }
-        }
+            return next;
+        });
     };
-
-    const handleTouchStart = (group: any) => handleMouseDown(group);
-    const handleTouchEnd = (group: any) => handleMouseUp(group);
 
     return (
         <div className="mb-6 bg-white/50 rounded-3xl p-4 border border-gray-100/50">
@@ -92,44 +63,70 @@ const IngredientSection: React.FC<IngredientSectionProps> = ({
 
             <div className="flex flex-wrap gap-2 justify-center transition-all duration-500 ease-in-out">
                 {groupedItems.map((group: any) => {
-                    // --- RENDER LOGIC ---
+                    // Logic:
+                    // 1. If Section Expanded OR (Group is Expanded Individually AND isGroup) -> Render Cluster
+                    // 2. Else -> Render Chip
 
-                    // 1. Expanded Cluster (Group Mode with Multiple Variants)
-                    if (isExpanded && group.isGroup) {
+                    const showAsCluster = isExpanded || (group.isGroup && expandedSubGroups.has(group.name));
+
+                    if (showAsCluster && group.isGroup) {
+                        // CLUSTER VIEW
                         return (
-                            <div key={group.name} className={`flex flex-wrap gap-1.5 p-1.5 rounded-2xl border transition-all 
+                            <div key={group.name} className={`flex flex-col gap-2 p-2 rounded-2xl border transition-all animate-in fade-in zoom-in-95 duration-200
                                 ${colorClass.replace('text-', 'border-').replace('700', '100')} 
                                 ${colorClass.replace('text-', 'bg-').replace('700', '50/30')}`}>
-                                {group.variants.map((variant: any) => (
-                                    <button
-                                        key={variant.name}
-                                        onClick={() => onToggle(variant.name)}
-                                        className={`relative flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border select-none
-                                            ${selectedIngredients.includes(variant.name)
-                                                ? 'bg-white border-orange-200 text-orange-600 shadow-sm font-bold'
-                                                : 'bg-white/60 text-gray-500 border-transparent hover:bg-white'}`}
-                                    >
-                                        <span>{variant.icon}</span>
-                                        {variant.name}
-                                    </button>
-                                ))}
+
+                                {/* Header (Click to Collapse if supported) */}
+                                <div
+                                    onClick={() => !isExpanded && toggleSubGroup(group.name)}
+                                    className={`flex items-center justify-between px-1 ${!isExpanded ? 'cursor-pointer hover:opacity-70' : ''}`}
+                                >
+                                    <div className="flex items-center gap-1 text-xs font-bold opacity-70">
+                                        <span>{group.icon}</span>
+                                        <span>{group.name}</span>
+                                    </div>
+                                    {!isExpanded && <ChevronUp size={12} className="opacity-50" />}
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5">
+                                    {group.variants.map((variant: any) => (
+                                        <button
+                                            key={variant.name}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onToggle(variant.name);
+                                            }}
+                                            className={`relative flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border select-none
+                                                ${selectedIngredients.includes(variant.name)
+                                                    ? 'bg-white border-orange-200 text-orange-600 shadow-sm font-bold'
+                                                    : 'bg-white/60 text-gray-500 border-transparent hover:bg-white'}`}
+                                        >
+                                            <span>{variant.icon}</span>
+                                            {variant.name}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         );
                     }
 
-                    // 2. Standard Chip (Collapsed OR Single Item)
-                    const itemToRender = group; // Collapsed: Group Header. Expanded Single: Same object structure effectively.
+                    // STANDARD CHIP VIEW
+                    const itemToRender = group;
                     const selectedCount = itemToRender.variants.filter((v: any) => selectedIngredients.includes(v.name)).length;
                     const isSelected = selectedCount > 0;
 
                     return (
                         <button
                             key={itemToRender.name}
-                            onMouseDown={() => !isExpanded && handleMouseDown(itemToRender)}
-                            onMouseUp={() => !isExpanded && handleMouseUp(itemToRender)}
-                            onClick={() => isExpanded && onToggle(itemToRender.variants[0].name)} // Direct click if single item expanded
-                            onTouchStart={() => !isExpanded && handleTouchStart(itemToRender)}
-                            onTouchEnd={() => !isExpanded && handleTouchEnd(itemToRender)}
+                            onClick={() => {
+                                if (itemToRender.isGroup) {
+                                    // Click Group -> Expand Inline
+                                    toggleSubGroup(itemToRender.name);
+                                } else {
+                                    // Click Single Item -> Toggle Selection
+                                    onToggle(itemToRender.variants[0].name);
+                                }
+                            }}
                             className={`relative flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all border select-none
                                 ${isSelected
                                     ? `${colorClass} border-transparent shadow-sm scale-105`
@@ -138,10 +135,10 @@ const IngredientSection: React.FC<IngredientSectionProps> = ({
                             <span>{itemToRender.icon}</span>
                             {itemToRender.name}
 
-                            {/* Badge only in Collapsed + Group */}
-                            {!isExpanded && itemToRender.isGroup && (
-                                <span className="ml-1 text-[8px] opacity-70 bg-black/10 px-1.5 py-0.5 rounded-full font-bold">
-                                    {selectedCount > 0 ? selectedCount : (itemToRender.variants.length > 1 ? '+' : '')}
+                            {/* Badge */}
+                            {itemToRender.isGroup && (
+                                <span className={`ml-1 text-[8px] opacity-70 px-1.5 py-0.5 rounded-full font-bold flex items-center ${isSelected ? 'bg-black/10' : 'bg-gray-100'}`}>
+                                    {selectedCount > 0 ? selectedCount : <ChevronDown size={8} />}
                                 </span>
                             )}
                         </button>
