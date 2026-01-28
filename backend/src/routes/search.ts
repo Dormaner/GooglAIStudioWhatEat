@@ -27,18 +27,46 @@ router.post('/by-ingredients', async (req: Request, res: Response) => {
 
         if (error) throw error;
 
+        // Synonym Mapping for Semantic Matching (Core synonyms that don't share substrings)
+        const SYNONYM_MAP: Record<string, string> = {
+            '番茄': '西红柿', '西红柿': '番茄',
+            '马铃薯': '土豆', '土豆': '马铃薯',
+            '生抽': '酱油', '老抽': '酱油',
+            '鸡精': '味精', '味精': '鸡精',
+        };
+
+        const normalize = (name: string) => SYNONYM_MAP[name] || name;
+
         // Filter recipes based on matching logic
         const matchedRecipes = recipes?.map(recipe => {
             const recipeIngredientNames = recipe.recipe_ingredients?.map(
                 (ri: any) => ri.ingredients.name
             ) || [];
 
-            const matchingCount = recipeIngredientNames.filter((name: string) =>
-                ingredients.includes(name)
-            ).length;
+            // User has these ingredients (Raw + Normalized)
+            // We keep a list to iterate for substring checks
+            const userIngredientsList = ingredients;
+
+            const isMatch = (recipeItem: string) => {
+                // 1. Exact Match
+                if (ingredients.includes(recipeItem)) return true;
+
+                // 2. Synonym Match
+                const normRecipe = normalize(recipeItem);
+                if (ingredients.some((u: string) => normalize(u) === normRecipe)) return true;
+
+                // 3. Substring / Fuzzy Match (The "AI" part)
+                // "大蒜子" (User) should satisfy "蒜" (Recipe) -> UserString includes RecipeString
+                // "木耳" (User) should satisfy "大木耳" (Recipe) -> RecipeString includes UserString
+                return userIngredientsList.some((u: string) =>
+                    u.includes(recipeItem) || recipeItem.includes(u)
+                );
+            };
+
+            const matchingCount = recipeIngredientNames.filter(isMatch).length;
 
             const missingIngredients = recipeIngredientNames.filter(
-                (name: string) => !ingredients.includes(name)
+                (name: string) => !isMatch(name)
             );
 
             return {
@@ -74,18 +102,32 @@ router.post('/by-ingredients', async (req: Request, res: Response) => {
             ingredients: {
                 main: item.recipe.recipe_ingredients
                     ?.filter((ri: any) => ri.type === 'main')
-                    .map((ri: any) => ({
-                        name: ri.ingredients.name,
-                        amount: ri.amount,
-                        status: ingredients.includes(ri.ingredients.name) ? 'stocked' : 'missing'
-                    })) || [],
+                    .map((ri: any) => {
+                        const name = ri.ingredients.name;
+                        const normName = normalize(name);
+                        const isStocked = ingredients.includes(name) ||
+                            ingredients.some((u: string) => normalize(u) === normName) ||
+                            ingredients.some((u: string) => u.includes(name) || name.includes(u));
+                        return {
+                            name: ri.ingredients.name,
+                            amount: ri.amount,
+                            status: isStocked ? 'stocked' : 'missing'
+                        };
+                    }) || [],
                 condiments: item.recipe.recipe_ingredients
                     ?.filter((ri: any) => ri.type === 'condiment')
-                    .map((ri: any) => ({
-                        name: ri.ingredients.name,
-                        amount: ri.amount,
-                        status: ingredients.includes(ri.ingredients.name) ? 'stocked' : 'missing'
-                    })) || []
+                    .map((ri: any) => {
+                        const name = ri.ingredients.name;
+                        const normName = normalize(name);
+                        const isStocked = ingredients.includes(name) ||
+                            ingredients.some((u: string) => normalize(u) === normName) ||
+                            ingredients.some((u: string) => u.includes(name) || name.includes(u));
+                        return {
+                            name: ri.ingredients.name,
+                            amount: ri.amount,
+                            status: isStocked ? 'stocked' : 'missing'
+                        };
+                    }) || []
             },
             steps: item.recipe.recipe_steps
                 ?.sort((a: any, b: any) => a.step_order - b.step_order)
