@@ -104,10 +104,11 @@ export const groupIngredients = (ingredients: any[]) => {
         return g;
     };
 
+    // 1. Check Static Lists & Smart Rules
     ingredients.forEach(item => {
         if (processed.has(item.id)) return;
 
-        // 1. Check Static Lists
+        // Static Lists
         for (const [groupName, variants] of Object.entries(INGREDIENT_GROUPS)) {
             if (variants.includes(item.name) || variants.some(v => item.name === v)) {
                 const g = getGroup(groupName, item.icon);
@@ -117,7 +118,7 @@ export const groupIngredients = (ingredients: any[]) => {
             }
         }
 
-        // 2. Check Smart Rules
+        // Smart Rules
         for (const [groupName, rule] of Object.entries(SMART_RULES)) {
             if (rule.keywords.some(k => item.name.includes(k))) {
                 if (rule.excludes && rule.excludes.some(e => item.name.includes(e))) continue;
@@ -130,49 +131,88 @@ export const groupIngredients = (ingredients: any[]) => {
         }
     });
 
-    // 3. Dynamic Clustering (The "AI" Feature)
-    // Find remaining standalone items and try to cluster them by containment
-    const remainingIds = ingredients.filter(i => !processed.has(i.id)).map(i => i.id);
-    const remainingItems = ingredients.filter(i => remainingIds.includes(i.id));
+    // 2. Existing Dynamic Clustering (Containment: "Egg" captures "Big Egg")
+    // This requires the "Root" (Short word) to be present in the list
+    let remainingItems = ingredients.filter(i => !processed.has(i.id));
 
-    // Sort by length ascending (shortest first) -> logic: shorter words are potential "Roots"
+    // Sort by length ascending (shortest first)
     remainingItems.sort((a, b) => a.name.length - b.name.length);
 
-    // We need to group items where A is a substring of B. 
-    // e.g. "Snail" (root) <- "African Snail"
-    // e.g. "Bread" (root) <- "Whole Wheat Bread"
-
-    const dynamicGroups: Map<string, any[]> = new Map();
-    const dynamicProcessed = new Set<string>();
-
+    // Re-verify containment with updated processed list
+    // (We iterate multiple times to handle nested chains if needed, but simple pass is enough for now)
     for (let i = 0; i < remainingItems.length; i++) {
         const root = remainingItems[i];
-        if (dynamicProcessed.has(root.id)) continue;
+        if (processed.has(root.id)) continue;
 
-        // Find all other items that contain this root's name
         const children = remainingItems.filter((child, index) => {
-            if (index <= i) return false; // Only look ahead
-            if (dynamicProcessed.has(child.id)) return false;
+            if (index <= i) return false;
+            if (processed.has(child.id)) return false;
             return child.name.includes(root.name);
         });
 
         if (children.length > 0) {
-            // We found a cluster!
-            // Promote 'root' to be the Group Name
             const g = getGroup(root.name, root.icon);
-            g.variants.push(root); // Add itself
+            g.variants.push(root);
             processed.add(root.id);
-            dynamicProcessed.add(root.id);
-
             children.forEach(child => {
                 g.variants.push(child);
                 processed.add(child.id);
-                dynamicProcessed.add(child.id);
             });
         }
     }
 
-    // 4. Add truly standalone items
+    // 3. New: Auto-Discovery Clustering (Common Substring)
+    // This handles "Big Egg" & "Small Egg" when "Egg" is MISSING from the list.
+    remainingItems = ingredients.filter(i => !processed.has(i.id));
+
+    // We look for common substrings of length >= 2
+    if (remainingItems.length > 1) {
+        // Map of Substring -> List of Items containing it
+        const substrMap = new Map<string, any[]>();
+
+        remainingItems.forEach(item => {
+            const name = item.name;
+            // Generate all substrings >= 2 chars
+            for (let len = 2; len <= name.length; len++) {
+                for (let start = 0; start <= name.length - len; start++) {
+                    const sub = name.substring(start, start + len);
+                    if (!substrMap.has(sub)) substrMap.set(sub, []);
+                    substrMap.get(sub)?.push(item);
+                }
+            }
+        });
+
+        // Filter valid groups: size >= 2
+        // We want to prioritize Longest strings first (e.g. "Little Chicken" > "Chicken")? 
+        // No, actually "Chicken" is better than "cken". 
+        // Strategy: 
+        // 1. Sort substrings by Length DESC (Specific first? No, actually we want Generic first).
+        //    Actually for grouping, "Apple Pie" and "Apple Juice" -> "Apple" is better.
+        //    "Big Red Apple" and "Small Red Apple" -> "Red Apple" is better than "Apple".
+        //    Let's Sort by Length DESC. This captures "Red Apple".
+        // 2. Iterate and claim items.
+
+        const candidates = Array.from(substrMap.entries())
+            .filter(([_, items]) => items.length >= 2)
+            .sort((a, b) => b[0].length - a[0].length); // Longest substring first
+
+        for (const [sub, items] of candidates) {
+            // Check if these items are still available (not taken by a better group)
+            const availableItems = items.filter(i => !processed.has(i.id));
+
+            if (availableItems.length >= 2) {
+                // Found a new implicit group!
+                // Use the first item's icon as the group icon (approximate)
+                const g = getGroup(sub, availableItems[0].icon);
+                availableItems.forEach(i => {
+                    g.variants.push(i);
+                    processed.add(i.id);
+                });
+            }
+        }
+    }
+
+    // 4. Add remaining standalone items
     ingredients.forEach(i => {
         if (!processed.has(i.id)) {
             groups.push({
@@ -186,7 +226,12 @@ export const groupIngredients = (ingredients: any[]) => {
 
     // Post-process: Sort variants inside groups
     groups.forEach(g => {
-        g.variants.sort((a, b) => a.name.length - b.name.length);
+        // Sort variants: exact match first, then by length
+        g.variants.sort((a, b) => {
+            if (a.name === g.name) return -1;
+            if (b.name === g.name) return 1;
+            return a.name.length - b.name.length;
+        });
     });
 
     return groups;
