@@ -78,13 +78,6 @@ router.post('/', async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Name and category are required' });
         }
 
-        // Check if exists
-        const { data: existing } = await supabase
-            .from('ingredients')
-            .select('id, category')
-            .eq('name', name)
-            .single();
-
         // Determine default icon if not provided/needed
         let defaultIcon = icon;
         if (!defaultIcon) {
@@ -99,9 +92,15 @@ router.post('/', async (req: Request, res: Response) => {
             }
         }
 
+        // 1. Check if exists
+        const { data: existing } = await supabase
+            .from('ingredients')
+            .select('id, category')
+            .eq('name', name)
+            .single();
+
         if (existing) {
-            // If exists, update its category to the requested one (claiming it from 'other' or fixing a mistake)
-            // Only update if category is different to avoid unnecessary writes, but updating icon is good too if provided
+            // 2. If exists, Update
             const { data: updated, error: updateError } = await supabase
                 .from('ingredients')
                 .update({ category, icon: defaultIcon })
@@ -110,20 +109,23 @@ router.post('/', async (req: Request, res: Response) => {
                 .single();
 
             if (updateError) throw updateError;
-
-            // Return successfully
+            console.log(`[POST /ingredients] Updated existing: ${name}`);
             return res.status(200).json(updated);
         }
 
+        // 3. If not exists, Insert
         const { data: newIngredient, error } = await supabase
             .from('ingredients')
             .insert({ name, category, icon: defaultIcon })
-            .select()
+            .select() // V2 required select() to return data
             .single();
 
         if (error) throw error;
 
-        res.status(201).json(newIngredient);
+        // If it was an update (existing item), it returns the item.
+        // If it was an insert, it returns the new item.
+        console.log(`[POST /ingredients] Successfully processed: ${name}`);
+        res.status(200).json(newIngredient);
     } catch (error: any) {
         console.error('Error creating ingredient:', error);
         res.status(500).json({ error: error.message });

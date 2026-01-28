@@ -65,7 +65,7 @@ const SMART_RULES: Record<string, { keywords: string[], excludes?: string[] }> =
     '玉米': { keywords: ['玉米'], excludes: ['玉米油', '玉米淀粉'] },
 
     // --- STAPLES ---
-    '米面': { keywords: ['米', '面', '粉', '馒头', '饼', '意面', '粉丝'], excludes: ['虾', '鸡', '肉', '汤', '粉蒸', '玉米', '小米辣', '花椒粉', '辣椒粉', '孜然粉', '胡椒粉', '淀粉', '生粉'] },
+    '米面': { keywords: ['米', '面', '粉', '馒头', '饼', '意面', '粉丝'], excludes: ['虾', '鸡', '肉', '汤', '粉蒸', '玉米', '小米辣', '花椒粉', '辣椒粉', '孜然粉', '胡椒粉', '淀粉', '生粉', '醋', '酱', '酒'] },
     '薯类': { keywords: ['地瓜', '红薯', '紫薯', '芋头', '山药'], excludes: [] },
 
     // --- AROMATICS ---
@@ -76,10 +76,10 @@ const SMART_RULES: Record<string, { keywords: string[], excludes?: string[] }> =
 
     // --- CONDIMENTS (Refined) ---
     '食用油': { keywords: ['油'], excludes: ['蚝油', '酱油', '豉油', '奶油', '黄油', '牛油', '红油', '花椒油'] },
-    '酱油/醋': { keywords: ['生抽', '老抽', '酱油', '豉油', '醋'], excludes: [] },
+    '酱油/醋': { keywords: ['生抽', '老抽', '酱油', '豉油', '醋', '米醋', '陈醋', '白醋'], excludes: [] },
     '糖/盐/味精': { keywords: ['糖', '盐', '味精', '鸡精'], excludes: [] },
-    '酱料': { keywords: ['酱'], excludes: ['酱油', '果酱'] },
-    '烹饪酒': { keywords: ['料酒', '黄酒', '白酒', '啤酒'], excludes: [] },
+    '酱料': { keywords: ['酱', '甜面酱', '豆瓣酱'], excludes: ['酱油', '果酱'] },
+    '烹饪酒': { keywords: ['料酒', '黄酒', '白酒', '啤酒', '米酒'], excludes: [] },
     '干香料': { keywords: ['花椒', '八角', '桂皮', '香叶', '孜然', '胡椒', '辣椒粉', '五香粉'], excludes: ['青花椒'] },
     '淀粉': { keywords: ['淀粉', '生粉', '嫩肉粉'], excludes: [] },
 
@@ -89,6 +89,58 @@ const SMART_RULES: Record<string, { keywords: string[], excludes?: string[] }> =
     '烹饪电器': { keywords: ['烤箱', '微波炉', '空气炸锅', '破壁机', '搅拌机', '打蛋器', '电饭煲', '高压锅', '绞肉机'], excludes: [] },
     '其他工具': { keywords: ['铲', '勺', '碗', '盘', '筷', '叉', '擀面杖', '模具', '锡纸', '吸油纸', '保鲜膜'], excludes: ['淀粉'] },
 };
+
+// Start of Mapping Logic
+const GROUP_CATEGORY_MAP: Record<string, string> = {
+    // Meats
+    '牛肉': 'meat', '猪肉': 'meat', '鸡肉': 'meat', '羊肉': 'meat', '鸭/鹅': 'meat',
+    // Seafood
+    '鱼': 'meat', '虾': 'meat', '蟹': 'meat', '贝类': 'meat', '软体海鲜': 'meat',
+    // Vegetables
+    '白菜类': 'vegetable', '青菜类': 'vegetable', '生菜/菊苣': 'vegetable', '菠菜': 'vegetable',
+    '蒿菜': 'vegetable', '空心菜': 'vegetable', '苋菜': 'vegetable', '西兰花/花菜': 'vegetable',
+    '萝卜': 'vegetable', '瓜类': 'vegetable', '茄子': 'vegetable', '豆类蔬菜': 'vegetable',
+    '莲藕': 'vegetable', '笋': 'vegetable', '芦笋': 'vegetable', '椒': 'vegetable',
+    '洋葱': 'vegetable', '番茄': 'vegetable', '菌菇': 'vegetable', '豆腐/豆制品': 'vegetable', '玉米': 'vegetable',
+    // Staples
+    '米面': 'staple', '薯类': 'staple',
+    // Aromatics (Treat as Condiment for "Missing" purposes)
+    '葱': 'condiment', '蒜': 'condiment', '姜': 'condiment', '香菜': 'condiment',
+    // Condiments
+    '食用油': 'condiment', '酱油/醋': 'condiment', '糖/盐/味精': 'condiment',
+    '酱料': 'condiment', '烹饪酒': 'condiment', '干香料': 'condiment', '淀粉': 'condiment'
+    // Kitchenware ignored for ingredients check usually
+};
+
+export const getIngredientCategory = (name: string): 'core' | 'aux' | 'unknown' => {
+    // 1. Check Static Lists
+    for (const [groupName, variants] of Object.entries(INGREDIENT_GROUPS)) {
+        if (variants.includes(name) || variants.some(v => name.includes(v))) { // Loose match for static
+            const cat = GROUP_CATEGORY_MAP[groupName];
+            if (cat === 'meat' || cat === 'vegetable' || cat === 'staple') return 'core';
+            if (cat === 'condiment') return 'aux';
+        }
+    }
+
+    // 2. Check Smart Rules
+    for (const [groupName, rule] of Object.entries(SMART_RULES)) {
+        if (rule.keywords.some(k => name.includes(k))) {
+            if (rule.excludes && rule.excludes.some(e => name.includes(e))) continue;
+
+            const cat = GROUP_CATEGORY_MAP[groupName];
+            if (cat === 'meat' || cat === 'vegetable' || cat === 'staple') return 'core';
+            if (cat === 'condiment') return 'aux';
+        }
+    }
+
+    // Default fallback: if ends with '酱' or '油' or '粉' -> Aux, else Unknown (assume Core to be safe?)
+    // Actually, let's default to 'core' if it looks like a substantive noun, or 'unknown'.
+    // User example: "排骨" (Ribs) -> Core. "豆瓣酱" (Bean Paste) -> Aux.
+    if (name.includes('酱') || name.includes('油') || name.includes('粉') || name.includes('醋') || name.includes('酒') || name.includes('糖') || name.includes('盐')) return 'aux';
+
+    return 'core'; // Treat unknown as core ingredient (safe bet)
+};
+
 
 export const groupIngredients = (ingredients: any[]) => {
     const processed = new Set<string>();

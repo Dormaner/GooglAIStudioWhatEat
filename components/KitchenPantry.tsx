@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, Plus } from 'lucide-react';
+import { deleteIngredient, addNewIngredient } from '../services/api'; // Import API functions
 import AddIngredientModal from './AddIngredientModal';
 import IngredientSection from './IngredientSection';
 import VariantSelectionModal from './VariantSelectionModal';
@@ -12,11 +13,12 @@ interface KitchenPantryProps {
     selectedIngredients: string[];
     onToggleIngredient: (name: string) => void;
     onAddIngredient: (name: string, category: string, icon?: string) => void;
+    onDeleteIngredient: (item: any) => void;
     onSearch: () => void;
 }
 
 const KitchenPantry: React.FC<KitchenPantryProps> = ({
-    isOpen, onClose, ingredients, selectedIngredients, onToggleIngredient, onAddIngredient, onSearch
+    isOpen, onClose, ingredients, selectedIngredients, onToggleIngredient, onAddIngredient, onDeleteIngredient, onSearch
 }) => {
     // State needed for Add Modal
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -26,7 +28,26 @@ const KitchenPantry: React.FC<KitchenPantryProps> = ({
     const [variantModalOpen, setVariantModalOpen] = useState(false);
     const [activeGroup, setActiveGroup] = useState<{ name: string, variants: any[] } | null>(null);
 
-    if (!isOpen) return null;
+    // Edit Mode State
+    const [isEditMode, setIsEditMode] = useState(false);
+    const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+
+    const handleBackgroundTouchStart = () => {
+        longPressTimer.current = setTimeout(() => {
+            setIsEditMode(true);
+        }, 800);
+    };
+
+    const handleBackgroundTouchEnd = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+    };
+
+    const handleBackgroundClick = () => {
+        if (isEditMode) setIsEditMode(false);
+    };
 
     const handleOpenAdd = (category: string) => {
         // Map display title back to internal category
@@ -41,13 +62,25 @@ const KitchenPantry: React.FC<KitchenPantryProps> = ({
         setVariantModalOpen(true);
     };
 
+    if (!isOpen) return null;
+
     return (
         <>
             <div className="fixed inset-0 bg-black/20 z-40 backdrop-blur-sm" onClick={onClose} />
-            <div className={`fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-50 transition-transform duration-300 transform ${isOpen ? 'translate-y-0' : 'translate-y-full'}`}>
+            <div
+                className={`fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-50 transition-transform duration-300 transform ${isOpen ? 'translate-y-0' : 'translate-y-full'} ${isEditMode ? 'bg-gray-50' : ''}`}
+                onMouseDown={handleBackgroundTouchStart}
+                onMouseUp={handleBackgroundTouchEnd}
+                onClick={handleBackgroundClick}
+                onTouchStart={handleBackgroundTouchStart}
+                onTouchEnd={handleBackgroundTouchEnd}
+            >
                 <div className="p-5 max-h-[85vh] overflow-y-auto pb-24">
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xl font-extrabold text-gray-800">🧂 我的厨房库</h3>
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-xl font-extrabold text-gray-800">🧂 我的厨房库</h3>
+                            {isEditMode && <span className="text-xs text-red-500 animate-pulse bg-red-50 px-2 py-0.5 rounded-full">编辑模式</span>}
+                        </div>
                         <button onClick={onClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200">
                             <X size={20} className="text-gray-500" />
                         </button>
@@ -62,6 +95,8 @@ const KitchenPantry: React.FC<KitchenPantryProps> = ({
                         onToggle={onToggleIngredient}
                         onOpenAddModal={handleOpenAdd}
                         onOpenVariantModal={openVariantModal}
+                        isEditMode={isEditMode}
+                        onDelete={onDeleteIngredient}
                     />
 
                     <IngredientSection
@@ -73,6 +108,8 @@ const KitchenPantry: React.FC<KitchenPantryProps> = ({
                         onToggle={onToggleIngredient}
                         onOpenAddModal={handleOpenAdd}
                         onOpenVariantModal={openVariantModal}
+                        isEditMode={isEditMode}
+                        onDelete={onDeleteIngredient}
                     />
 
                     <div className="border-t border-gray-100 my-4 pt-4">
@@ -85,6 +122,8 @@ const KitchenPantry: React.FC<KitchenPantryProps> = ({
                             onToggle={onToggleIngredient}
                             onOpenAddModal={handleOpenAdd}
                             onOpenVariantModal={openVariantModal}
+                            isEditMode={isEditMode}
+                            onDelete={onDeleteIngredient}
                         />
                     </div>
                 </div>
@@ -110,8 +149,8 @@ const KitchenPantry: React.FC<KitchenPantryProps> = ({
                     let catName = '调料';
                     if (addCategory === 'staple') catName = '主食';
                     if (addCategory === 'tool') catName = '厨具';
+                    setIsAddModalOpen(false); // Close first!
                     onAddIngredient(name, catName, icon);
-                    setIsAddModalOpen(false);
                 }}
                 category={addCategory === 'condiment' ? '调料' : (addCategory === 'staple' ? '主食' : '厨具')}
             />

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Plus } from 'lucide-react';
 import { fetchIngredients, addNewIngredient, searchByIngredients, deleteIngredient } from '../services/api';
+import { getIngredientCategory } from '../constants/ingredientGroups';
 import { Recipe } from '../types';
 import KitchenPantry from '../components/KitchenPantry';
 import AddIngredientModal from '../components/AddIngredientModal';
@@ -279,6 +280,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
         selectedIngredients={selectedIngredients}
         onToggleIngredient={toggleIngredient}
         onAddIngredient={(name, cat, icon) => handleAddIngredient(name, icon, cat)}
+        onDeleteIngredient={handleDeleteIngredient}
         onSearch={handleSearch}
       />
 
@@ -350,9 +352,21 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
                         referrerPolicy="no-referrer"
                       />
                       {/* Missing Ingredients Badge */}
+                      {/* Missing Ingredients Badge - Split */}
                       {recipe.missingIngredients && recipe.missingIngredients.length > 0 && (
-                        <div className="absolute top-2 right-2 bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm border border-white/20">
-                          缺: {recipe.missingIngredients.slice(0, 2).join(' ')}{recipe.missingIngredients.length > 2 ? '...' : ''}
+                        <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                          {/* Core Ingredients (Red) */}
+                          {recipe.missingIngredients.filter(i => getIngredientCategory(i) === 'core').length > 0 && (
+                            <div className="bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm border border-white/20">
+                              缺食材: {recipe.missingIngredients.filter(i => getIngredientCategory(i) === 'core').slice(0, 2).join(' ')}
+                            </div>
+                          )}
+                          {/* Auxiliary Ingredients (Orange/Yellow) */}
+                          {recipe.missingIngredients.filter(i => getIngredientCategory(i) === 'aux').length > 0 && (
+                            <div className="bg-amber-500/90 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm border border-white/20">
+                              缺辅料: {recipe.missingIngredients.filter(i => getIngredientCategory(i) === 'aux').slice(0, 2).join(' ')}
+                            </div>
+                          )}
                         </div>
                       )}
 
