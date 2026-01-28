@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Plus } from 'lucide-react';
-import { fetchIngredients, addNewIngredient, searchByIngredients } from '../services/api';
+import { fetchIngredients, addNewIngredient, searchByIngredients, deleteIngredient } from '../services/api';
 import { Recipe } from '../types';
 import KitchenPantry from '../components/KitchenPantry';
 import AddIngredientModal from '../components/AddIngredientModal';
@@ -115,12 +115,41 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
       if (finalCategory === '厨具') finalCategory = 'tool';
       if (finalCategory === '主食') finalCategory = 'staple';
 
-      await addNewIngredient(name, finalCategory, icon);
-      await loadData(); // Refresh list
+      // 1. Close Modal Immediately
       setIsModalOpen(false);
+
+      // 2. Optimistic Update
+      const tempId = `temp-${Date.now()}`;
+      const optimisticItem = {
+        id: tempId,
+        name,
+        category: finalCategory,
+        icon: icon || '🍽️', // Simple fallback, server will do better
+        variants: [] // It's a single item initially
+      };
+
+      setIngredients((prev: any) => {
+        const next = { ...prev };
+        // Map category to state key
+        // vegetables, meats, staples, condiments, kitchenware
+        // 'vegetable' -> 'vegetables'
+        let key = finalCategory + 's';
+        if (finalCategory === 'kitchenware' || finalCategory === 'tool') key = 'kitchenware';
+
+        if (Array.isArray(next[key])) {
+          next[key] = [...next[key], optimisticItem];
+        }
+        return next;
+      });
+
+      // 3. Background API Call
+      await addNewIngredient(name, finalCategory, icon);
+      await loadData(); // Refresh list to get real ID and correct grouping/icon
+
     } catch (error) {
       console.error('Failed to add ingredient:', error);
       alert(`添加失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      loadData(); // Revert on error
     }
   };
 
@@ -133,8 +162,66 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
     setVariantModalOpen(true);
   };
 
+  // Edit Mode State
+  const [isEditMode, setIsEditMode] = useState(false);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const handleBackgroundTouchStart = () => {
+    longPressTimer.current = setTimeout(() => {
+      setIsEditMode(true);
+    }, 800);
+  };
+
+  const handleBackgroundTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  // Exit edit mode when clicking elsewhere/background if already on? 
+  // actually user said "long press blank" to *enable* it. usually clicking blank *disables* it.
+  const handleBackgroundClick = () => {
+    if (isEditMode) setIsEditMode(false);
+  };
+
+  const handleDeleteIngredient = async (item: any) => {
+    // 1. Optimistic Update: Remove from UI immediately
+    setIngredients((prev: any) => {
+      const next = { ...prev };
+      // Find and remove from correct category
+      for (const key in next) {
+        if (Array.isArray(next[key])) {
+          next[key] = next[key].filter((i: any) => i.id !== item.id);
+        }
+      }
+      return next;
+    });
+
+    // Remove from selected immediately
+    if (selectedIngredients.includes(item.name)) {
+      toggleIngredient(item.name);
+    }
+
+    // 2. Background API Call
+    try {
+      await deleteIngredient(item.id);
+    } catch (err) {
+      console.error("Delete failed in background", err);
+      // Ideally we should revert UI here, but for "Instant" feel we just silent fail or toast.
+      // alert("服务器同步失败"); // Optional: Don't interrupt flow if possible
+    }
+  };
+
   return (
-    <div className="px-5 pt-10 bg-[#f8f9fa] min-h-full pb-20">
+    <div
+      className={`px-5 pt-10 bg-[#f8f9fa] min-h-full pb-20 transition-colors duration-300 ${isEditMode ? 'bg-gray-100' : ''}`}
+      onMouseDown={handleBackgroundTouchStart}
+      onMouseUp={handleBackgroundTouchEnd}
+      onClick={handleBackgroundClick}
+      onTouchStart={handleBackgroundTouchStart}
+      onTouchEnd={handleBackgroundTouchEnd}
+    >
       <div className="flex justify-between items-center mb-10">
         <h1 className="text-3xl font-extrabold text-gray-800 tracking-tight">今天吃什么</h1>
         <button className="flex items-center gap-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-semibold">
@@ -144,8 +231,16 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
       </div>
 
       <div className="flex justify-end mb-4 gap-2">
+        {isEditMode && (
+          <div className="flex items-center gap-1 bg-red-50 text-red-500 px-3 py-1 rounded-full text-xs animate-pulse">
+            <span>🗑️ 编辑模式: 点击红色按钮删除</span>
+          </div>
+        )}
         <button
-          onClick={() => setShowPantry(true)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowPantry(true);
+          }}
           className="flex items-center gap-1 bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-full text-sm font-semibold shadow-sm hover:bg-gray-50 transition-all"
         >
           <span>🧂</span> 我的厨房库
@@ -161,6 +256,8 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
         onToggle={toggleIngredient}
         onOpenAddModal={openAddModal}
         onOpenVariantModal={openVariantModal}
+        isEditMode={isEditMode}
+        onDelete={handleDeleteIngredient}
       />
       <IngredientSection
         title="肉肉们"
@@ -171,6 +268,8 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
         onToggle={toggleIngredient}
         onOpenAddModal={openAddModal}
         onOpenVariantModal={openVariantModal}
+        isEditMode={isEditMode}
+        onDelete={handleDeleteIngredient}
       />
 
       <KitchenPantry

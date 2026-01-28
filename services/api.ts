@@ -55,6 +55,11 @@ export const addNewIngredient = async (name: string, category: string, icon?: st
     return response.data;
 };
 
+export const deleteIngredient = async (id: string): Promise<{ message: string }> => {
+    const response = await api.delete(`/api/ingredients/${id}`);
+    return response.data;
+};
+
 export const fetchUserIngredients = async (userId?: string): Promise<any[]> => {
     const response = await api.get('/api/ingredients/user-ingredients', {
         params: { userId },

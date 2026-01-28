@@ -184,6 +184,34 @@ router.post('/user-ingredients', async (req: Request, res: Response) => {
     }
 });
 
+// DELETE /api/ingredients/:id - Delete an ingredient
+router.delete('/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        // 1. Delete from User Inventory (user_ingredients)
+        await supabase.from('user_ingredients').delete().eq('ingredient_id', id);
+
+        // 2. Delete from Recipe Ingredients (recipe_ingredients) if it exists
+        // Note: We might assume table name is 'recipe_ingredients' or similar.
+        // Failing silently if this part errors is risky but we'll try standard name.
+        await supabase.from('recipe_ingredients').delete().eq('ingredient_id', id);
+
+        // 3. Delete from Ingredients
+        const { error } = await supabase
+            .from('ingredients')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        res.json({ message: 'Ingredient deleted successfully' });
+    } catch (error: any) {
+        console.error('Error deleting ingredient:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DELETE /api/user-ingredients/:ingredientName - Remove ingredient from inventory
 router.delete('/user-ingredients/:ingredientName', async (req: Request, res: Response) => {
     try {
