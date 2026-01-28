@@ -197,7 +197,7 @@ const processRecipe = async (id: string) => {
                 let { data: ingDb } = await supabase.from('ingredients').select('id').eq('name', ing.name).single();
                 if (!ingDb) {
                     const { data: createdIng } = await supabase.from('ingredients').insert({
-                        name: ing.name, category: 'condiment', icon: '🥘' // Default icon
+                        name: ing.name, category: 'other', icon: '🥘' // Default icon
                     }).select().single();
                     ingDb = createdIng;
                 }

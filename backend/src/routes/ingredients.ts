@@ -19,7 +19,9 @@ router.get('/', async (req: Request, res: Response) => {
             vegetables: ingredients?.filter(i => i.category === 'vegetable') || [],
             meats: ingredients?.filter(i => i.category === 'meat') || [],
             staples: ingredients?.filter(i => i.category === 'staple') || [],
-            condiments: ingredients?.filter(i => i.category === 'condiment') || []
+            condiments: ingredients?.filter(i => i.category === 'condiment') || [],
+            kitchenware: ingredients?.filter(i => i.category === 'kitchenware' || i.category === 'tool') || [],
+            others: ingredients?.filter(i => !['vegetable', 'meat', 'staple', 'condiment', 'kitchenware', 'tool'].includes(i.category)) || []
         };
 
         res.json(grouped);
@@ -89,6 +91,8 @@ router.post('/', async (req: Request, res: Response) => {
                 case 'meat': defaultIcon = '🥩'; break;
                 case 'staple': defaultIcon = '🍚'; break;
                 case 'condiment': defaultIcon = '🧂'; break;
+                case 'kitchenware':
+                case 'tool': defaultIcon = '🍳'; break;
                 default: defaultIcon = '🍽️';
             }
         }

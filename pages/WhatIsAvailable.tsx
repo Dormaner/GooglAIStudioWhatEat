@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import { fetchIngredients, fetchRecipes, addNewIngredient, searchByIngredients } from '../services/api';
 import { Recipe } from '../types';
+import KitchenPantry from '../components/KitchenPantry';
 import AddIngredientModal from '../components/AddIngredientModal';
 
 interface WhatIsAvailableProps {
@@ -11,13 +12,13 @@ interface WhatIsAvailableProps {
 
 const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>(['土豆', '胡萝卜', '鸡蛋']);
-  const [ingredients, setIngredients] = useState<any>({ vegetables: [], meats: [], staples: [] });
+  const [ingredients, setIngredients] = useState<any>({ vegetables: [], meats: [], staples: [], condiments: [], kitchenware: [] });
+  const [showPantry, setShowPantry] = useState(false);
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
   const [displayedRecipes, setDisplayedRecipes] = useState<Recipe[]>([]);
 
   // Display loading state
   const [loading, setLoading] = useState(false);
-  const [matchMode, setMatchMode] = useState<'fuzzy' | 'strict'>('strict');
 
   // Add Ingredient Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -85,12 +86,18 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
       setLoading(true);
       setDisplayedRecipes([]);
 
-      // Switch to Local DB Search for Xiachufang recipes
-      // strict=false means fuzzy match (at least one ingredient)
-      // matchMode state controls how we filter the RESULTS
+      // Always use fuzzy search (strict=false) to get all potential matches
+      const results = await searchByIngredients(selectedIngredients, false);
 
-      const results = await searchByIngredients(selectedIngredients, matchMode === 'strict');
-      setDisplayedRecipes(results);
+      // Sort by missing ingredients count (ascending)
+      // Recipes with 0 missing ingredients come first
+      const sortedResults = results.sort((a, b) => {
+        const missingA = a.missingIngredients?.length || 0;
+        const missingB = b.missingIngredients?.length || 0;
+        return missingA - missingB;
+      });
+
+      setDisplayedRecipes(sortedResults);
 
     } catch (err) {
       console.error('Local search failed', err);
@@ -99,18 +106,10 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
     }
   };
 
-  // Re-run filter if matchMode changes
-  useEffect(() => {
-    if (selectedIngredients.length > 0 && !loading) {
-      handleSearch();
-    }
-  }, [matchMode]);
-
   // ... (omitted sections)
 
-  <p className="text-[10px] text-gray-400">
-    {matchMode === 'strict' ? '精准匹配：不应该缺少任何食材' : '模糊匹配：可能需要额外购买食材'}
-  </p>
+  // Remove the toggle UI entirely
+
 
 
 
@@ -129,7 +128,9 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
     const categoryMap: Record<string, string> = {
       '菜菜们': 'vegetable',
       '肉肉们': 'meat',
-      '主食也一起下锅吗？': 'staple'
+      '主食也一起下锅吗？': 'staple',
+      '调料': 'condiment',
+      '厨具': 'tool'
     };
     setModalCategory(categoryMap[category] || 'condiment');
     setIsModalOpen(true);
@@ -186,17 +187,30 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
         </button>
       </div>
 
-      <div className="flex gap-2 justify-end mb-6">
-        <button className="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-xs font-medium">调料</button>
-        <button className="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-xs font-medium">厨具</button>
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => setShowPantry(true)}
+          className="flex items-center gap-1 bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-full text-sm font-semibold shadow-sm hover:bg-gray-50 transition-all"
+        >
+          <span>🧂</span> 我的厨房库
+        </button>
       </div>
 
       <IngredientSection title="菜菜们" icon="🥬" items={ingredients.vegetables} colorClass="bg-green-100 text-green-700" />
       <IngredientSection title="肉肉们" icon="🥩" items={ingredients.meats} colorClass="bg-red-100 text-red-700" />
-      <IngredientSection title="主食也一起下锅吗？" icon="🍚" items={ingredients.staples} colorClass="bg-yellow-50 text-yellow-700" />
 
-      <div className="mt-10 mb-6">
-        <div className="fixed bottom-20 left-0 right-0 px-6 pointer-events-none z-50 flex justify-center">
+      <KitchenPantry
+        isOpen={showPantry}
+        onClose={() => setShowPantry(false)}
+        ingredients={ingredients}
+        selectedIngredients={selectedIngredients}
+        onToggleIngredient={toggleIngredient}
+        onAddIngredient={(name, cat, icon) => handleAddIngredient(name, icon)}
+        onSearch={handleSearch}
+      />
+
+      <div className={`mt-10 mb-6 transition-opacity duration-300 ${showPantry ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+        <div className="fixed bottom-20 left-0 right-0 px-6 z-30 flex justify-center">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -220,23 +234,8 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
             <span className="text-xl">🍲</span>
             <h3 className="text-lg font-bold text-gray-800">来看看组合出的菜谱吧！</h3>
           </div>
-
-          <div className="flex bg-gray-100 p-1 rounded-xl">
-            <button
-              onClick={() => setMatchMode('strict')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${matchMode === 'strict' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400'}`}
-            >
-              严格匹配
-            </button>
-            <button
-              onClick={() => setMatchMode('fuzzy')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${matchMode === 'fuzzy' ? 'bg-white text-amber-500 shadow-sm' : 'text-gray-400'}`}
-            >
-              模糊匹配
-            </button>
-          </div>
           <p className="text-[10px] text-gray-400">
-            {matchMode === 'strict' ? '必须包含所有选中的食材' : '包含部分食材，会标注缺少的食材'}
+            优先展示食材齐全的菜谱，缺少食材的排在后面
           </p>
         </div>
 

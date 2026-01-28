@@ -42,6 +42,7 @@ export interface IngredientsByCategory {
     meats: Array<{ id: string; name: string; category: string; icon?: string }>;
     staples: Array<{ id: string; name: string; category: string; icon?: string }>;
     condiments: Array<{ id: string; name: string; category: string; icon?: string }>;
+    kitchenware: Array<{ id: string; name: string; category: string; icon?: string }>;
 }
 
 export const fetchIngredients = async (): Promise<IngredientsByCategory> => {

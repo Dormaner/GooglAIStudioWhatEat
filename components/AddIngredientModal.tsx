@@ -18,7 +18,9 @@ const AddIngredientModal: React.FC<AddIngredientModalProps> = ({ isOpen, onClose
         vegetable: '蔬菜',
         meat: '肉类',
         staple: '主食',
-        condiment: '调料'
+        condiment: '调料',
+        tool: '厨具',
+        kitchenware: '厨具'
     };
 
     const handleSubmit = (e: React.FormEvent) => {
