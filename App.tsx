@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { AppTab, Recipe, ViewMode } from './types';
 import WhatToEat from './pages/WhatToEat';
@@ -6,12 +5,31 @@ import WhatIsAvailable from './pages/WhatIsAvailable';
 import RecipeDetail from './pages/RecipeDetail';
 import CookingMode from './pages/CookingMode';
 import Navbar from './components/Navbar';
+import { BackHandlerProvider, useBackHandler } from './contexts/BackHandlerContext';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('what-to-eat');
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('video');
   const [isCooking, setIsCooking] = useState(false);
+
+  // Native Back Button Handling (Prioritized Overlays)
+  useBackHandler(() => {
+    // 1. Cooking Mode (Top Priority)
+    if (isCooking) {
+      setIsCooking(false);
+      return true;
+    }
+
+    // 2. Recipe Detail (Second Priority)
+    if (selectedRecipe) {
+      setSelectedRecipe(null);
+      return true;
+    }
+
+    // Default: Not handled by global overlays
+    return false;
+  }, [isCooking, selectedRecipe]);
 
   const handleRecipeClick = useCallback((recipe: Recipe) => {
     setSelectedRecipe(recipe);
@@ -50,7 +68,7 @@ const App: React.FC = () => {
 
         {/* Recipe Detail View - Overlays the main content */}
         {selectedRecipe && !isCooking && (
-          <div className="absolute inset-0 bg-white z-50 overflow-y-auto">
+          <div className="absolute inset-0 bg-white z-50 overflow-y-auto animate-in slide-in-from-right duration-300">
             <RecipeDetail
               recipe={selectedRecipe}
               mode={viewMode}
@@ -63,7 +81,7 @@ const App: React.FC = () => {
 
         {/* Cooking Mode - Full screen overlay */}
         {isCooking && selectedRecipe && (
-          <div className="absolute inset-0 bg-white z-50">
+          <div className="absolute inset-0 bg-white z-50 animate-in fade-in duration-300">
             <CookingMode
               recipe={selectedRecipe}
               mode={viewMode}
@@ -77,6 +95,14 @@ const App: React.FC = () => {
         <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
       )}
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <BackHandlerProvider>
+      <AppContent />
+    </BackHandlerProvider>
   );
 };
 

@@ -206,11 +206,11 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto bg-white overflow-hidden shadow-2xl relative">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-gray-50 bg-white sticky top-0 z-50">
+      <div className="flex items-center justify-between px-4 pt-14 pb-4 border-b border-gray-50 bg-white sticky top-0 z-50">
         <button onClick={handleSafeBack} className="p-2 -ml-2">
           <ChevronLeft size={28} className="text-gray-800" />
         </button>
-        <h2 className="text-xl font-bold text-gray-800 flex-1 ml-4 line-clamp-1">{currentRecipe.name}</h2>
+        <h2 className="text-2xl font-extrabold text-gray-800 flex-1 ml-4 line-clamp-1 tracking-tight">{currentRecipe.name}</h2>
         <div className="flex items-center gap-3">
 
           {/* Cooked Count (Pot) */}
@@ -314,7 +314,7 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
                 onTouchEnd={handleTouchEnd}
               >
                 <img
-                  src={`http://localhost:3001/api/image?url=${encodeURIComponent((currentStep?.image || currentRecipe.image) || '')}`}
+                  src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent((currentStep?.image || currentRecipe.image) || '')}`}
                   className="w-full h-auto object-contain block transition-opacity duration-300"
                   alt="Step Preview"
                   referrerPolicy="no-referrer"

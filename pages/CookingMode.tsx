@@ -29,7 +29,7 @@ const CookingMode: React.FC<CookingModeProps> = ({ recipe, mode, onExit }) => {
     <div className="fixed inset-0 bg-black text-white z-[100] flex flex-col max-w-md mx-auto h-screen overflow-hidden">
 
       {/* 1. TOP PROGRESS BAR (Fixed at very top) */}
-      <div className="absolute top-0 left-0 right-0 z-30 pt-safe-top">
+      <div className="absolute top-12 left-0 right-0 z-30 pt-safe-top">
         <div className="h-1 w-full bg-white/20">
           <div
             className="h-full bg-orange-500 transition-all duration-300 ease-out"
@@ -41,7 +41,7 @@ const CookingMode: React.FC<CookingModeProps> = ({ recipe, mode, onExit }) => {
       {/* Immersive Background */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <img
-          src={`http://localhost:3001/api/image?url=${encodeURIComponent(currentStep.image || recipe.image)}`}
+          src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent(currentStep.image || recipe.image)}`}
           className="w-full h-full object-cover opacity-10 blur-xl scale-110"
           alt="Backdrop"
           referrerPolicy="no-referrer"
@@ -54,7 +54,7 @@ const CookingMode: React.FC<CookingModeProps> = ({ recipe, mode, onExit }) => {
         {/* Image Container - No Aspect Ratio Lock, just Full Width */}
         <div className="relative w-full shadow-2xl">
           <img
-            src={`http://localhost:3001/api/image?url=${encodeURIComponent(currentStep.image || recipe.image)}`}
+            src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent(currentStep.image || recipe.image)}`}
             className="w-full h-auto object-cover max-h-[50vh] mx-auto bg-black/20"
             alt="Step illustration"
             referrerPolicy="no-referrer"
@@ -67,7 +67,7 @@ const CookingMode: React.FC<CookingModeProps> = ({ recipe, mode, onExit }) => {
         </div>
 
         {/* Navigation Zones (Overlay entire screen center area) */}
-        <div className="absolute inset-y-[-20vh] left-0 right-0 flex z-30 pointer-events-auto h-[140%]">
+        <div className="absolute top-[10vh] bottom-0 left-0 right-0 flex z-30 pointer-events-auto">
           <div className="flex-1 bg-transparent active:bg-white/5 transition-colors" onClick={prevStep}></div>
           <div className="flex-1 bg-transparent active:bg-white/5 transition-colors" onClick={nextStep}></div>
         </div>
@@ -117,9 +117,9 @@ const CookingMode: React.FC<CookingModeProps> = ({ recipe, mode, onExit }) => {
       {/* Close Button Fixed Top Right */}
       <button
         onClick={onExit}
-        className="absolute top-6 right-4 z-40 w-8 h-8 bg-black/40 text-white/70 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-transform"
+        className="absolute top-14 right-4 z-[200] w-10 h-10 bg-black/40 text-white/90 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-transform shadow-lg border border-white/10 pointer-events-auto"
       >
-        <X size={18} />
+        <X size={24} />
       </button>
 
     </div>

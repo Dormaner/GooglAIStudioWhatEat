@@ -8,6 +8,7 @@ import KitchenPantry from '../components/KitchenPantry';
 import AddIngredientModal from '../components/AddIngredientModal';
 import IngredientSection from '../components/IngredientSection';
 import VariantSelectionModal from '../components/VariantSelectionModal';
+import { useBackHandler } from '../contexts/BackHandlerContext';
 
 interface WhatIsAvailableProps {
   onRecipeClick: (recipe: Recipe) => void;
@@ -27,6 +28,8 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
   // Add Ingredient Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalCategory, setModalCategory] = useState('');
+
+
 
   // Initial data load
   useEffect(() => {
@@ -158,6 +161,24 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
   const [variantModalOpen, setVariantModalOpen] = useState(false);
   const [activeGroup, setActiveGroup] = useState<{ name: string, variants: any[] } | null>(null);
 
+  // Add Back Handling
+  useBackHandler(() => {
+    // Priority LIFO logic for modals
+    if (variantModalOpen) {
+      setVariantModalOpen(false);
+      return true;
+    }
+    if (isModalOpen) {
+      setIsModalOpen(false);
+      return true;
+    }
+    if (showPantry) {
+      setShowPantry(false);
+      return true;
+    }
+    return false;
+  }, [variantModalOpen, isModalOpen, showPantry]);
+
   const openVariantModal = (group: any) => {
     setActiveGroup(group);
     setVariantModalOpen(true);
@@ -216,7 +237,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
 
   return (
     <div
-      className={`px-5 pt-10 bg-[#f8f9fa] min-h-full pb-20 transition-colors duration-300 ${isEditMode ? 'bg-gray-100' : ''}`}
+      className={`px-5 pt-14 bg-[#f8f9fa] min-h-full pb-20 transition-colors duration-300 ${isEditMode ? 'bg-gray-100' : ''}`}
       onMouseDown={handleBackgroundTouchStart}
       onMouseUp={handleBackgroundTouchEnd}
       onClick={handleBackgroundClick}
@@ -224,7 +245,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
       onTouchEnd={handleBackgroundTouchEnd}
     >
       <div className="flex justify-between items-center mb-10">
-        <h1 className="text-3xl font-extrabold text-gray-800 tracking-tight">今天吃什么</h1>
+        <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">今天吃什么</h1>
         <button className="flex items-center gap-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-semibold">
           <Plus size={18} />
           存新菜
@@ -346,7 +367,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
                   >
                     <div className="relative w-full aspect-video bg-gray-100">
                       <img
-                        src={`http://localhost:3001/api/image?url=${encodeURIComponent(recipe.image || '')}`}
+                        src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent(recipe.image || '')}`}
                         alt={recipe.name}
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
