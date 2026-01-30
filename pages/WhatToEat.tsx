@@ -32,7 +32,7 @@ const WhatToEat: React.FC<WhatToEatProps> = ({ onRecipeClick }) => {
 
   useEffect(() => {
     loadRecipes();
-  }, {});
+  }, []);
 
   // Reset pagination when category or search changes
   useEffect(() => {

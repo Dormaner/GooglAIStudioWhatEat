@@ -150,4 +150,13 @@ export const incrementCookedCount = async (recipeId: string) => {
     return response.json();
 };
 
+export const sendVoiceCommand = async (payload: { text: string; recipeId: string; currenStep: number; totalSteps: number; currentInsight?: string }) => {
+    const response = await fetch(`${API_URL}/api/voice/command`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    return response.json();
+};
+
 export default api;

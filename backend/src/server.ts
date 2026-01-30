@@ -62,10 +62,12 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`🚀 WhatEat API server is running on http://localhost:${PORT}`);
-    console.log(`📊 Health check: http://localhost:${PORT}/health`);
-});
+// Start server if run directly (not imported)
+if (process.env.NODE_ENV !== 'production' || process.argv[1].endsWith('server.ts')) {
+    app.listen(PORT, () => {
+        console.log(`🚀 WhatEat API server is running on http://localhost:${PORT}`);
+        console.log(`📊 Health check: http://localhost:${PORT}/health`);
+    });
+}
 
 export default app;
