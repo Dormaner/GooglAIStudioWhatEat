@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/supabase.js';
+import { isIngredientAvailable } from '../utils/ingredientMatcher.js'; // Static import
 
 const router = Router();
 
@@ -242,6 +243,48 @@ router.delete('/user-ingredients/:ingredientName', async (req: Request, res: Res
         res.json({ message: 'Ingredient removed successfully' });
     } catch (error: any) {
         console.error('Error removing user ingredient:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /api/ingredients/check-stock - Check availability with fuzzy matching
+router.post('/check-stock', async (req: Request, res: Response) => {
+    try {
+        const { ingredients: targetIngredients, userId = 'default-user' } = req.body;
+
+        if (!targetIngredients || !Array.isArray(targetIngredients)) {
+            return res.status(400).json({ error: "Ingredients list required" });
+        }
+
+        // 1. Fetch User's entire inventory (Explicit query matching working endpoint)
+        console.log(`[Check-Stock] User: ${userId}, Targets: ${targetIngredients.join(',')}`);
+
+        const { data: userIngredients, error } = await supabase
+            .from('user_ingredients')
+            .select(`
+                ingredients (name)
+            `)
+            .eq('user_id', userId);
+
+        if (error) {
+            console.error('[Check-Stock] DB Error:', error);
+            throw error;
+        }
+
+        // Flatten to string array
+        const inventoryNames = userIngredients?.map((ui: any) => ui.ingredients?.name).filter(Boolean) || [];
+        console.log(`[Check-Stock] Found ${inventoryNames.length} items in inventory: ${inventoryNames.slice(0, 5).join(',')}`);
+
+        // 2. Check each ingredient
+        const results = targetIngredients.reduce((acc: any, ingName: string) => {
+            acc[ingName] = isIngredientAvailable(inventoryNames, ingName);
+            return acc;
+        }, {});
+
+        res.json(results);
+
+    } catch (error: any) {
+        console.error('Error checking stock:', error);
         res.status(500).json({ error: error.message });
     }
 });

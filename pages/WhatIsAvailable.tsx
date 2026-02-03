@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, Plus } from 'lucide-react';
+import { supabase } from '../config/supabase';
 import { fetchIngredients, addNewIngredient, searchByIngredients, deleteIngredient } from '../services/api';
 import { getIngredientCategory } from '../constants/ingredientGroups';
 import { Recipe } from '../types';
@@ -42,6 +42,21 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
         fetchIngredients(),
       ]);
       setIngredients(ingredientsData);
+
+      // Add: Load user's persisted inventory to sync selection state
+      const { fetchUserIngredients } = await import('../services/api');
+
+      // Use real user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || 'default-user';
+
+      const userInv = await fetchUserIngredients(userId);
+      if (userInv && userInv.length > 0) {
+        const names = userInv.map((i: any) => i.name || i.ingredientName).filter(Boolean);
+        // Merge with defaults or replace? Let's unique merge to be safe
+        setSelectedIngredients(prev => Array.from(new Set([...prev, ...names])));
+      }
+
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -75,10 +90,32 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
     }
   };
 
-  const toggleIngredient = (name: string) => {
+  const toggleIngredient = async (name: string) => {
+    // 1. Optimistic Update
+    const isSelected = selectedIngredients.includes(name);
     setSelectedIngredients(prev =>
-      prev.includes(name) ? prev.filter(i => i !== name) : [...prev, name]
+      isSelected ? prev.filter(i => i !== name) : [...prev, name]
     );
+
+    // 2. Background Persistence
+    // 2. Background Persistence
+    try {
+      const { addUserIngredient, removeUserIngredient } = await import('../services/api');
+
+      // Use real user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || 'default-user';
+
+      if (isSelected) {
+        // Deselecting -> Remove from DB
+        await removeUserIngredient(name, userId);
+      } else {
+        // Selecting -> Add to DB
+        await addUserIngredient(name, 1, '个', userId);
+      }
+    } catch (e) {
+      console.error("Failed to persist toggle:", e);
+    }
   };
 
   const handleRecipeClickInternal = (recipe: Recipe) => {

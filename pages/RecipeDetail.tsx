@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, Play, Heart, Star, Edit3, ShoppingCart, CookingPot, ChevronRight, Loader2, Sparkles, ExternalLink } from 'lucide-react';
 import { Recipe, ViewMode } from '../types';
 import { analyzeRecipe } from '../services/api';
+import { supabase } from '../config/supabase';
 
 interface RecipeDetailProps {
   recipe: Recipe;
@@ -43,8 +44,9 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
     // 2. Fetch fresh data from API to ensure Insight is up-to-date
     const fetchFreshData = async () => {
       try {
+        const userId = await checkLogin(false); // Get userId silently
         const { fetchRecipeById } = await import('../services/api');
-        const freshRecipe = await fetchRecipeById(recipe.id);
+        const freshRecipe = await fetchRecipeById(recipe.id, recipe.name, userId || undefined);
         if (freshRecipe) {
           setCurrentRecipe(freshRecipe);
           setInsightText(freshRecipe.insight || '');
@@ -58,19 +60,192 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
 
   }, [recipe.id]); // Only re-run if recipe ID changes (page load)
 
+  // Use a simple ref to track login status to avoid async race in even handlers if possible, or just check auth.
+
+  const checkLogin = async (showError = true): Promise<string | null> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      if (showError) alert("请先登录账号！");
+      return null;
+    }
+    return session.user.id;
+  };
+
+  const recordCookingHistory = async (userId: string) => {
+    try {
+      const { error } = await supabase.from('cooking_history').insert({
+        user_id: userId,
+        recipe_id: recipe.id
+      });
+
+      if (error) {
+        // Ignore duplicate key error (already recorded)
+        if (error.code !== '23505') {
+          console.error("Cooking history insert error:", error);
+          // alert("记录失败: " + error.message);
+        }
+      } else {
+        // Success
+      }
+
+
+    } catch (e) {
+      console.error("Failed to record cooking history", e);
+    }
+  };
+
+
+
+  useEffect(() => {
+    const recordHistory = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Upsert to update timestamp if exists
+          await supabase.from('browsing_history').upsert({
+            user_id: user.id,
+            recipe_id: recipe.id,
+            viewed_at: new Date().toISOString()
+          }, { onConflict: 'user_id, recipe_id' });
+        }
+      } catch (e) {
+        console.error("Failed to record history", e);
+      }
+    };
+    recordHistory();
+  }, [recipe.id]);
+
+  // Inventory & Shopping Cart Logic
+  // Map: Ingredient Name -> Is Stocked (true) / Missing (false)
+  const [stockStatus, setStockStatus] = useState<Record<string, boolean>>({});
+  const [cartItems, setCartItems] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const loadInventoryAndCart = async () => {
+      const userId = await checkLogin(false);
+      if (!userId) return;
+
+      try {
+        // 1. Fetch Full User Inventory
+        // We use the same API as "My Kitchen" to ensure data consistency
+        const { fetchUserIngredients } = await import('../services/api');
+        const userIngredientsList = await fetchUserIngredients(userId);
+
+        // Extract names
+        const inventoryNames = userIngredientsList?.map((item: any) =>
+          item.name || item.ingredientName || item.ingredients?.name || ''
+        ).filter(Boolean) || [];
+
+        console.log("Loaded Inventory for Check:", inventoryNames);
+
+        // 2. Perform Local Fuzzy Check
+        const { isIngredientAvailable } = await import('../services/ingredientMatcher');
+        const ingredientsToCheck = currentRecipe.ingredients?.main?.map(i => i.name) || [];
+
+        const statusMap: Record<string, boolean> = {};
+        ingredientsToCheck.forEach(ingName => {
+          statusMap[ingName] = isIngredientAvailable(inventoryNames, ingName);
+        });
+
+        setStockStatus(statusMap);
+
+        // 3. Fetch User Cart
+        const { data: cartData } = await supabase
+          .from('shopping_cart')
+          .select('ingredient_name')
+          .eq('user_id', userId);
+
+        if (cartData) {
+          const cartNames = new Set(cartData.map((item: any) =>
+            (item.ingredient_name || '').trim().toLowerCase()
+          ));
+          setCartItems(cartNames);
+        }
+      } catch (e) {
+        console.error("Failed to load inventory/cart", e);
+      }
+    };
+    loadInventoryAndCart();
+  }, [recipe.id, currentRecipe.ingredients]); // Run when recipe or its ingredients change
+
+
+
+  const handleAddToCart = async (ingredientName: string) => {
+    const userId = await checkLogin(true);
+    if (!userId) return;
+
+    const normalizedName = ingredientName.trim().toLowerCase();
+
+    try {
+      if (cartItems.has(normalizedName)) {
+        alert("已经在购物车里啦");
+        return;
+      }
+
+      const { addToShoppingCart } = await import('../services/api');
+      await addToShoppingCart(ingredientName, userId); // Store original case
+
+      setCartItems(prev => new Set(prev).add(normalizedName));
+      alert(`已将 "${ingredientName}" 加入购物车`);
+    } catch (e) {
+      console.error("Add to cart failed", e);
+      alert("加入购物车失败，请重试");
+    }
+  };
+
   const handleToggleFavorite = async () => {
-    // Optimistic Update: Star Toggle ONLY
+    const userId = await checkLogin();
+    if (!userId) return;
+
+    // Optimistic Update
     const newState = !isCollected;
     setIsCollected(newState);
 
     try {
-      const { toggleFavorite } = await import('../services/api');
-      await toggleFavorite(recipe.id);
+      let targetId = recipe.id;
+      // Check if UUID
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId);
+
+      if (!isUUID) {
+        // Ensure persistent recipe exists
+        const { ensureRecipeForFavorite } = await import('../services/api');
+        const res = await ensureRecipeForFavorite(recipe.id, currentRecipe);
+        if (res && res.id) {
+          targetId = res.id;
+        } else {
+          throw new Error("Failed to ensure recipe for favorite");
+        }
+      }
+
+      // Perform toggle using Supabase directly (bypassing backend RLS issues)
+      const { data: existing } = await supabase
+        .from('user_favorites')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('recipe_id', targetId)
+        .single();
+
+      if (existing) {
+        // Remove
+        await supabase.from('user_favorites').delete().eq('id', existing.id);
+        // If we wanted exact sync, we'd check error, but optimistic is fine
+      } else {
+        // Add
+        const { error } = await supabase.from('user_favorites').insert({
+          user_id: userId,
+          recipe_id: targetId
+        });
+        if (error) throw error;
+      }
+
     } catch (e) {
+      console.error("Favorite toggle failed", e);
       // Revert
       setIsCollected(!newState);
+      alert("收藏失败，请重试");
     }
   };
+
 
   const handleIncrementCooked = async () => {
     // 1. Update Local Personal Count
@@ -83,8 +258,14 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
       const { incrementCookedCount } = await import('../services/api');
       await incrementCookedCount(recipe.id);
     } catch (e) {
-      // Ignore
-    }
+      // 3. Add to cooking_history table
+      const userId = await checkLogin(true); // Show error for explicit click
+      if (!userId) return;
+
+      await recordCookingHistory(userId);
+      alert("已记录到烹饪历史！");
+    };
+
   };
 
   const handleSaveInsight = async () => {
@@ -121,6 +302,20 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
     if (isEditingInsight) {
       await handleSaveInsight();
     }
+
+    // Try to record history silently if logged in
+    const userId = await checkLogin(false);
+    if (userId) {
+      // Increment global count silently
+      try {
+        const { incrementCookedCount } = await import('../services/api');
+        incrementCookedCount(recipe.id);
+      } catch (e) { }
+
+      await recordCookingHistory(userId);
+    }
+
+
     onEnterCooking();
   };
 
@@ -375,17 +570,38 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            {currentRecipe.ingredients?.main?.map((ing, idx) => (
-              <div key={idx} className={`p-2 rounded-lg flex items-center justify-between transition-all bg-gray-50 border border-transparent hover:border-orange-200`}>
-                <div className="flex items-center gap-2 overflow-hidden">
-                  <div className="w-1 h-6 bg-orange-200 rounded-full flex-shrink-0"></div>
-                  <div className="overflow-hidden">
-                    <div className="font-bold text-gray-800 text-xs truncate">{ing.name}</div>
-                    <div className="text-gray-400 text-[10px] mt-0.5 truncate">{ing.amount || '适量'}</div>
+            {currentRecipe.ingredients?.main?.map((ing, idx) => {
+              const inStock = stockStatus[ing.name]; // True = Stocked, False = Missing
+              const normalizedName = (ing.name || '').trim().toLowerCase();
+              const inCart = cartItems.has(normalizedName);
+
+              return (
+                <div key={idx} className={`p-2 rounded-lg flex items-center justify-between transition-all bg-gray-50 border border-transparent hover:border-orange-200`}>
+                  <div className="flex items-center gap-2 overflow-hidden flex-1">
+                    <div className="w-1 h-6 bg-orange-200 rounded-full flex-shrink-0"></div>
+                    <div className="overflow-hidden">
+                      <div className="font-bold text-gray-800 text-xs truncate">{ing.name}</div>
+                      <div className="text-gray-400 text-[10px] mt-0.5 truncate">{ing.amount || '适量'}</div>
+                      {!inStock && (
+                        <div className="text-red-500 text-[10px] mt-0.5 font-medium flex items-center gap-1">
+                          <span>⚠️ 家中暂缺</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Shopping Cart Button */}
+                  <button
+                    onClick={() => handleAddToCart(ing.name)}
+                    className={`p-2 rounded-full transition-colors ${inCart || inStock ? 'text-gray-300 cursor-default' : 'text-orange-500 hover:bg-orange-100'}`}
+                    disabled={inCart || inStock}
+                    title={inStock ? "家中有货" : inCart ? "已在购物车" : "加入购物车"}
+                  >
+                    <ShoppingCart size={16} className={inCart || inStock ? 'opacity-50' : ''} />
+                  </button>
                 </div>
-              </div>
-            ))}
+              )
+            })}
 
             {(!currentRecipe.ingredients?.main || currentRecipe.ingredients.main.length === 0) && (
               <div className="col-span-2 text-center py-4 text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200 text-xs">

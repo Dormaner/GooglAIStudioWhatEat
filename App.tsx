@@ -5,6 +5,7 @@ import WhatIsAvailable from './pages/WhatIsAvailable';
 import RecipeDetail from './pages/RecipeDetail';
 import CookingMode from './pages/CookingMode';
 import Navbar from './components/Navbar';
+import Me from './pages/Me';
 import { BackHandlerProvider, useBackHandler } from './contexts/BackHandlerContext';
 
 const AppContent: React.FC = () => {
@@ -58,12 +59,8 @@ const AppContent: React.FC = () => {
           <div className={activeTab === 'what-is-available' ? 'block' : 'hidden'}>
             <WhatIsAvailable onRecipeClick={handleRecipeClick} />
           </div>
-          {activeTab === 'me' && (
-            <div className="p-8 text-center text-gray-500">
-              <h1 className="text-2xl font-bold text-gray-800 mb-4">我的</h1>
-              <p>个人中心页面开发中...</p>
-            </div>
-          )}
+          {activeTab === 'me' && <Me onRecipeClick={handleRecipeClick} />}
+
         </div>
 
         {/* Recipe Detail View - Overlays the main content */}

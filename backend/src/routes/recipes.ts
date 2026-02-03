@@ -70,8 +70,8 @@ router.get('/:id', async (req: Request, res: Response) => {
         const userId = (req.query.userId as string) || 'default-user';
 
         // 1. Fetch Recipe
-        const { data: recipe, error } = await supabase
-            .from('recipes')
+        let recipe: any = null;
+        const queryBuilder = supabase.from('recipes')
             .select(`
         *,
         recipe_steps (*),
@@ -81,22 +81,71 @@ router.get('/:id', async (req: Request, res: Response) => {
           ingredients (id, name, category, icon)
         )
       `)
-            .eq('id', id)
-            .single();
+            .select(`
+        *,
+        recipe_steps (*),
+        recipe_ingredients (
+          amount,
+          type,
+          ingredients (id, name, category, icon)
+        )
+      `);
 
-        if (error) throw error;
-        if (!recipe) {
+        // Only query by ID if it is a valid UUID
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+        if (isUUID) {
+            const { data, error } = await queryBuilder.eq('id', id).single();
+            if (!error) recipe = data;
+        } else {
+            // If not UUID, we can't find it by ID in this table.
+            recipe = null;
+        }
+
+
+        // 2. Fallback: If not found or invalid UUID, try to find by NAME (assuming unique names for external imports)
+        let foundRecipe = recipe;
+        if (!foundRecipe) {
+            const name = req.query.name as string;
+            if (name) {
+                const { data: byName } = await supabase
+                    .from('recipes')
+                    .select(`
+                        *,
+                        recipe_steps (*),
+                        recipe_ingredients (
+                          amount,
+                          type,
+                          ingredients (id, name, category, icon)
+                        )
+                      `)
+                    .eq('name', name)
+                    .single();
+                if (byName) {
+                    foundRecipe = byName;
+                    // We found the persistent version of this external recipe!
+                }
+            }
+        }
+
+        if (!foundRecipe) {
+            // If truly not found, we can just return 404. 
+            // BUT for the frontend "fresh fetch", if it returns 404 the frontend keeps the old state.
+            // That is acceptable behavior.
             return res.status(404).json({ error: 'Recipe not found' });
         }
 
-        // 2. Fetch Favorites Status (Is Collected?)
+        // Use the found persistent recipe for the rest of logic
+        recipe = foundRecipe;
+
+        // 3. Fetch Favorites Status (Is Collected?)
         let isCollected = false;
         if (userId) {
             const { data: fav } = await supabase
                 .from('user_favorites')
                 .select('id')
                 .eq('user_id', userId)
-                .eq('recipe_id', id)
+                .eq('recipe_id', recipe.id) // Use the REAL UUID we found
                 .single();
             isCollected = !!fav;
         }
@@ -145,28 +194,54 @@ router.get('/:id', async (req: Request, res: Response) => {
     }
 });
 
-// POST /api/recipes/:id/favorite - Toggle Favorite (Collect)
+// POST /api/recipes/:id/favorite - Ensure Recipe Exists & Return UUID (Frontend handles Favorite)
 router.post('/:id/favorite', async (req: Request, res: Response) => {
     try {
-        const { id } = req.params;
-        const { userId = 'default-user' } = req.body;
+        let { id } = req.params;
+        const { recipe } = req.body;
 
-        const { data: existing } = await supabase
-            .from('user_favorites')
-            .select('id')
-            .eq('user_id', userId)
-            .eq('recipe_id', id)
-            .single();
+        // CHECK IF ID IS VALID UUID
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-        if (existing) {
-            await supabase.from('user_favorites').delete().eq('id', existing.id);
-            return res.json({ isCollected: false });
-        } else {
-            await supabase.from('user_favorites').insert({ user_id: userId, recipe_id: id });
-            return res.json({ isCollected: true });
+        if (!isUUID) {
+            // It's an external ID. Find or Create persistent recipe.
+
+            // 1. Try to find by Name
+            let { data: existingRecipe } = await supabase
+                .from('recipes')
+                .select('id')
+                .eq('name', recipe?.name || '')
+                .single();
+
+            if (existingRecipe) {
+                id = existingRecipe.id;
+            } else if (recipe) {
+                // 2. Create new recipe
+                console.log("Creating new recipe for external favorite:", recipe.name);
+                const { data: newRecipe, error: createError } = await supabase
+                    .from('recipes')
+                    .insert({
+                        name: recipe.name,
+                        image: recipe.image || '',
+                        insight: recipe.insight || '',
+                        cooked_count: 0
+                        // link: recipe.link
+                    })
+                    .select('id')
+                    .single();
+
+                if (createError) throw createError;
+                id = newRecipe.id;
+            } else {
+                return res.status(400).json({ error: "Cannot favorite external recipe without recipe data" });
+            }
         }
+
+        // Return the UUID to the frontend
+        res.json({ id });
+
     } catch (error: any) {
-        console.error('Error toggling favorite:', error);
+        console.error('Error ensuring recipe for favorite:', error);
         res.status(500).json({ error: error.message });
     }
 });

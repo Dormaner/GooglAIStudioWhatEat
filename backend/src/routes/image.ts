@@ -17,8 +17,8 @@ router.get('/', async (req, res) => {
             method: 'GET',
             responseType: 'stream',
             headers: {
-                'Referer': '', // Crucial: Remove referer
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', // Fake desktop
+                'Referer': 'https://www.xiachufang.com/', // Mimic valid referer
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             }
         });
 

@@ -16,8 +16,10 @@ export const fetchRecipes = async (): Promise<Recipe[]> => {
     return response.data;
 };
 
-export const fetchRecipeById = async (id: string): Promise<Recipe> => {
-    const response = await api.get(`/api/recipes/${id}`);
+export const fetchRecipeById = async (id: string, name?: string, userId?: string): Promise<Recipe> => {
+    const response = await api.get(`/api/recipes/${id}`, {
+        params: { name, userId }
+    });
     return response.data;
 };
 
@@ -124,13 +126,14 @@ export const analyzeRecipe = async (bvid: string) => {
     return response.json();
 };
 
-export const toggleFavorite = async (recipeId: string) => {
+// Returns the persistent UUID for the recipe (created if needed)
+export const ensureRecipeForFavorite = async (recipeId: string, recipeData?: Partial<Recipe>) => {
     const response = await fetch(`${API_URL}/recipes/${recipeId}/favorite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: 'default-user' })
+        body: JSON.stringify({ recipe: recipeData }) // Send recipe data
     });
-    return response.json();
+    return response.json(); // Returns { id: string }
 };
 
 export const updateRecipeInsight = async (recipeId: string, insight: string) => {
@@ -157,6 +160,24 @@ export const sendVoiceCommand = async (payload: { text: string; recipeId: string
         body: JSON.stringify(payload)
     });
     return response.json();
+};
+
+export const addToShoppingCart = async (ingredientName: string, userId: string = 'default-user', amount?: string) => {
+    const response = await fetch(`${API_URL}/api/shopping-cart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, ingredientName, amount })
+    });
+    return response.json();
+};
+
+export const checkIngredientStock = async (ingredients: string[], userId: string = 'default-user') => {
+    const response = await fetch(`${API_URL}/api/ingredients/check-stock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ingredients, userId })
+    });
+    return response.json(); // Returns { "Tomato": true, "Potato": false }
 };
 
 export default api;
