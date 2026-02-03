@@ -604,11 +604,11 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
                   {/* Shopping Cart Button */}
                   <button
                     onClick={() => handleAddToCart(ing.name)}
-                    className={`p-2 rounded-full transition-colors ${inCart || inStock ? 'text-gray-300 cursor-default' : 'text-orange-500 hover:bg-orange-100'}`}
-                    disabled={inCart || inStock}
-                    title={inStock ? "家中有货" : inCart ? "已在购物车" : "加入购物车"}
+                    className={`p-2 rounded-full transition-colors ${inCart ? 'text-gray-300 cursor-default' : 'text-orange-500 hover:bg-orange-100'}`}
+                    disabled={inCart}
+                    title={inCart ? "已在购物车" : "加入购物车"}
                   >
-                    <ShoppingCart size={16} className={inCart || inStock ? 'opacity-50' : ''} />
+                    <ShoppingCart size={16} className={inCart ? 'opacity-50' : ''} />
                   </button>
                 </div>
               )

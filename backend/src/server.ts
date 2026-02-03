@@ -7,6 +7,7 @@ import ingredientsRouter from './routes/ingredients.js';
 import searchRouter from './routes/search.js';
 import aiRouter from './routes/ai.js';
 import imageRouter from './routes/image.js';
+import shoppingCartRouter from './routes/shoppingCart.js';
 import { scrapeXiachufang } from './services/scraper.js';
 
 dotenv.config();
@@ -50,6 +51,7 @@ app.use('/api/recipes', recipesRouter);
 app.use('/api/ingredients', ingredientsRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/image', imageRouter); // Register here
+app.use('/api/shopping-cart', shoppingCartRouter);
 
 // 404 handler
 app.use((req, res) => {
