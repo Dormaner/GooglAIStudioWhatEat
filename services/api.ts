@@ -180,4 +180,14 @@ export const checkIngredientStock = async (ingredients: string[], userId: string
     return response.json(); // Returns { "Tomato": true, "Potato": false }
 };
 
+export const checkAiIngredientStock = async (userIngredients: string[], recipeIngredients: string[]) => {
+    const response = await fetch(`${API_URL}/api/ai/match-ingredients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userIngredients, recipeIngredients })
+    });
+    if (!response.ok) throw new Error('AI Service Unavailable');
+    return response.json();
+};
+
 export default api;

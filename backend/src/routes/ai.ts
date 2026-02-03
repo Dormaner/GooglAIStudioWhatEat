@@ -118,4 +118,55 @@ router.post('/analyze', async (req: Request, res: Response) => {
     }
 });
 
+// New Endpoint: Semantic Ingredient Matching
+router.post('/match-ingredients', async (req: Request, res: Response) => {
+    try {
+        const { userIngredients, recipeIngredients } = req.body;
+
+        if (!userIngredients || !recipeIngredients) {
+            return res.status(400).json({ error: 'Missing ingredients data' });
+        }
+
+        console.log(`[AI Match] Comparing ${userIngredients.length} user items vs ${recipeIngredients.length} recipe items`);
+
+        // Prompt engineering for the chef assistant
+        const prompt = `
+        Role: Expert Chef.
+        Task: Check if the user has the required ingredients for a recipe.
+        
+        User Inventory: ${JSON.stringify(userIngredients)}
+        Recipe Requirements: ${JSON.stringify(recipeIngredients)}
+        
+        Rules:
+        1. Semantic Match: "Roasted Sausage" matches "Sausage". "Ribeye" matches "Beef".
+        2. Ignore quantities.
+        3. Return a JSON object where keys are the EXACT names from "Recipe Requirements" and values are booleans (true if available/substitutable, false if missing).
+        
+        Example Output JSON:
+        {
+            "Tomato": true,
+            "Beef": false
+        }
+        `;
+
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
+
+        // Clean json
+        let jsonStr = responseText.trim();
+        if (jsonStr.startsWith('```json')) jsonStr = jsonStr.replace(/^```json/, '').replace(/```$/, '');
+        if (jsonStr.startsWith('```')) jsonStr = jsonStr.replace(/^```/, '').replace(/```$/, '');
+
+        const matchResults = JSON.parse(jsonStr);
+        console.log('[AI Match] Result:', matchResults);
+
+        res.json(matchResults);
+
+    } catch (error) {
+        console.error('[AI Match] Failed:', error);
+        res.status(500).json({ error: 'AI matching failed' });
+    }
+});
+
 export default router;

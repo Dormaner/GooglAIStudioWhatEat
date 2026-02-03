@@ -138,14 +138,25 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
 
         console.log("Loaded Inventory for Check:", inventoryNames);
 
-        // 2. Perform Local Fuzzy Check
-        const { isIngredientAvailable } = await import('../services/ingredientMatcher');
+        // --- NEW: AI-Powered Semantic Matching with Fallback ---
+        // Strategy: Try AI first (Smart), fallback to Local Algorithm (Fast/Backup) if it fails.
+        let statusMap: Record<string, boolean> = {};
         const ingredientsToCheck = currentRecipe.ingredients?.main?.map(i => i.name) || [];
 
-        const statusMap: Record<string, boolean> = {};
-        ingredientsToCheck.forEach(ingName => {
-          statusMap[ingName] = isIngredientAvailable(inventoryNames, ingName);
-        });
+        try {
+          const { checkAiIngredientStock } = await import('../services/api');
+          // Optimistic UI could suggest "Analyzing..." here if needed, but for now we wait.
+          statusMap = await checkAiIngredientStock(inventoryNames, ingredientsToCheck);
+          console.log("AI Match Success:", statusMap);
+        } catch (aiError) {
+          console.warn("AI Match Failed, falling back to Local Algorithm:", aiError);
+
+          // --- FALLBACK: Local Algorithm (Preserved as requested) ---
+          const { isIngredientAvailable } = await import('../services/ingredientMatcher');
+          ingredientsToCheck.forEach(ingName => {
+            statusMap[ingName] = isIngredientAvailable(inventoryNames, ingName);
+          });
+        }
 
         setStockStatus(statusMap);
 
