@@ -171,6 +171,15 @@ export const addToShoppingCart = async (ingredientName: string, userId: string =
     return response.json();
 };
 
+export const updateShoppingCartItem = async (ingredientName: string, amount: string | number, userId: string = 'default-user') => {
+    const response = await fetch(`${API_URL}/api/shopping-cart`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, ingredientName, amount })
+    });
+    return response.json();
+};
+
 export const checkIngredientStock = async (ingredients: string[], userId: string = 'default-user') => {
     const response = await fetch(`${API_URL}/api/ingredients/check-stock`, {
         method: 'POST',

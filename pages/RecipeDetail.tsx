@@ -118,7 +118,9 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
   // Inventory & Shopping Cart Logic
   // Map: Ingredient Name -> Is Stocked (true) / Missing (false)
   const [stockStatus, setStockStatus] = useState<Record<string, boolean>>({});
-  const [cartItems, setCartItems] = useState<Set<string>>(new Set());
+  // Store quantity: Name -> Count
+  const [cartItems, setCartItems] = useState<Record<string, number>>({});
+  const [loadingCart, setLoadingCart] = useState(false);
 
   useEffect(() => {
     const loadInventoryAndCart = async () => {
@@ -163,14 +165,17 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
         // 3. Fetch User Cart
         const { data: cartData } = await supabase
           .from('shopping_cart')
-          .select('ingredient_name')
+          .select('ingredient_name, amount')
           .eq('user_id', userId);
 
         if (cartData) {
-          const cartNames = new Set(cartData.map((item: any) =>
-            (item.ingredient_name || '').trim().toLowerCase()
-          ));
-          setCartItems(cartNames);
+          const cartMap: Record<string, number> = {};
+          cartData.forEach((item: any) => {
+            const name = (item.ingredient_name || '').trim().toLowerCase();
+            // Ensure amount is number
+            cartMap[name] = parseInt(item.amount) || 1;
+          });
+          setCartItems(cartMap);
         }
       } catch (e) {
         console.error("Failed to load inventory/cart", e);
@@ -181,26 +186,59 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
 
 
 
-  const handleAddToCart = async (ingredientName: string) => {
+  const handleUpdateCart = async (ingredientName: string, delta: number) => {
     const userId = await checkLogin(true);
     if (!userId) return;
 
     const normalizedName = ingredientName.trim().toLowerCase();
+    const currentQty = cartItems[normalizedName] || 0;
+    const newQty = currentQty + delta;
 
     try {
-      if (cartItems.has(normalizedName)) {
-        alert("已经在购物车里啦");
-        return;
+      if (newQty <= 0) {
+        // Remove
+        const { deleteIngredient } = await import('../services/api');
+        // We need a specific delete for cart, reusing removeUserIngredient is WRONG if endpoints differ
+        // We implemented DELETE /api/shopping-cart in backend
+        // Let's call it directly or via api.ts
+        // NOTE: api.ts doesn't have deleteFromCart yet? Wait, let's check or just fetch directly
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/shopping-cart`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, ingredientName })
+        });
+        if (!response.ok) throw new Error("Delete failed");
+
+        setCartItems(prev => {
+          const next = { ...prev };
+          delete next[normalizedName];
+          return next;
+        });
+      } else {
+        // Update/Add
+        const { updateShoppingCartItem } = await import('../services/api');
+        // If currently 0, use POST or PUT? POST handles "Add 1". PUT handles "Set 1".
+        // Our backend PUT handles update. POST handles insert/increment. 
+        // If we are at 0 and click +, we want to set to 1. 
+        // Ideally we just use PUT for everything if it supports upsert? 
+        // Current PUT code: update ... eq ... -> So it implies existence.
+        // If not exists, we must use addToShoppingCart (POST).
+
+        if (currentQty === 0) {
+          const { addToShoppingCart } = await import('../services/api');
+          await addToShoppingCart(ingredientName, userId, String(newQty));
+        } else {
+          await updateShoppingCartItem(ingredientName, newQty, userId);
+        }
+
+        setCartItems(prev => ({
+          ...prev,
+          [normalizedName]: newQty
+        }));
       }
-
-      const { addToShoppingCart } = await import('../services/api');
-      await addToShoppingCart(ingredientName, userId); // Store original case
-
-      setCartItems(prev => new Set(prev).add(normalizedName));
-      alert(`已将 "${ingredientName}" 加入购物车`);
     } catch (e) {
-      console.error("Add to cart failed", e);
-      alert("加入购物车失败，请重试");
+      console.error("Cart update failed", e);
+      alert("购物车更新失败");
     }
   };
 
@@ -584,7 +622,8 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
             {currentRecipe.ingredients?.main?.map((ing, idx) => {
               const inStock = stockStatus[ing.name]; // True = Stocked, False = Missing
               const normalizedName = (ing.name || '').trim().toLowerCase();
-              const inCart = cartItems.has(normalizedName);
+              const qty = cartItems[normalizedName] || 0;
+              const inCart = qty > 0;
 
               return (
                 <div key={idx} className={`p-2 rounded-lg flex items-center justify-between transition-all bg-gray-50 border border-transparent hover:border-orange-200`}>
@@ -601,15 +640,32 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
                     </div>
                   </div>
 
-                  {/* Shopping Cart Button */}
-                  <button
-                    onClick={() => handleAddToCart(ing.name)}
-                    className={`p-2 rounded-full transition-colors ${inCart ? 'text-gray-300 cursor-default' : 'text-orange-500 hover:bg-orange-100'}`}
-                    disabled={inCart}
-                    title={inCart ? "已在购物车" : "加入购物车"}
-                  >
-                    <ShoppingCart size={16} className={inCart ? 'opacity-50' : ''} />
-                  </button>
+                  {/* Shopping Cart Button / Stepper */}
+                  {inCart ? (
+                    <div className="flex items-center bg-orange-100 rounded-full px-1">
+                      <button
+                        onClick={() => handleUpdateCart(ing.name, -1)}
+                        className="p-1 text-orange-600 hover:bg-orange-200 rounded-full transition-colors w-6 h-6 flex items-center justify-center font-bold"
+                      >
+                        -
+                      </button>
+                      <span className="text-xs font-bold text-orange-700 w-4 text-center">{qty}</span>
+                      <button
+                        onClick={() => handleUpdateCart(ing.name, 1)}
+                        className="p-1 text-orange-600 hover:bg-orange-200 rounded-full transition-colors w-6 h-6 flex items-center justify-center font-bold"
+                      >
+                        +
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleUpdateCart(ing.name, 1)}
+                      className="p-2 rounded-full transition-colors text-orange-500 hover:bg-orange-100"
+                      title="加入购物车"
+                    >
+                      <ShoppingCart size={16} />
+                    </button>
+                  )}
                 </div>
               )
             })}
