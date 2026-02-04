@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, RefreshCw, Loader2, Search } from 'lucide-react';
-import { fetchRecipes } from '../services/api';
+import { fetchRecipes, softDeleteRecipe } from '../services/api';
 import { Recipe } from '../types';
 import ParsingButton from '../components/ParsingButton';
 import SaveRecipeModal from '../components/SaveRecipeModal';
@@ -38,6 +38,37 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
   const [currentPage, setCurrentPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const RECIPES_PER_PAGE = 9;
+
+  // Delete Mode State
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleTouchStart = () => {
+    longPressTimerRef.current = setTimeout(() => {
+      setIsDeleteMode(true);
+      // Vibrate if supported
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 800); // 800ms long press
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+  };
+
+
+
+  // Exit delete mode when clicking outside or pressing escape
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (isDeleteMode && !(e.target as Element).closest('.recipe-card') && !(e.target as Element).closest('.delete-btn')) {
+        setIsDeleteMode(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [isDeleteMode]);
 
   // Modal state
   const [isSaveRecipeModalOpen, setIsSaveRecipeModalOpen] = useState(false);
@@ -78,10 +109,7 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
     }
   };
 
-  const handleRefresh = () => {
-    const maxPage = Math.floor(filteredRecipes.length / RECIPES_PER_PAGE);
-    setCurrentPage((prev) => (prev + 1) % (maxPage + 1));
-  };
+
 
   // Filter Logic
   const filteredRecipes = React.useMemo(() => {
@@ -102,12 +130,23 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
       const query = searchQuery.toLowerCase();
       result = result.filter(recipe =>
         recipe.name.toLowerCase().includes(query) ||
-        recipe.ingredients?.main?.some(i => i.name.toLowerCase().includes(i.name))
+        recipe.ingredients?.main?.some(i => i.name.toLowerCase().includes(query))
       );
     }
 
     return result;
   }, [recipes, selectedCategory, searchQuery]);
+
+  // Pagination Logic (Moved after filteredRecipes)
+  const maxPage = Math.max(0, Math.ceil(filteredRecipes.length / RECIPES_PER_PAGE) - 1);
+
+  const handleNext = () => {
+    setCurrentPage((prev) => (prev >= maxPage ? 0 : prev + 1));
+  };
+
+  const handlePrev = () => {
+    setCurrentPage((prev) => (prev <= 0 ? maxPage : prev - 1));
+  };
 
   const displayedRecipes = filteredRecipes.slice(
     currentPage * RECIPES_PER_PAGE,
@@ -199,14 +238,40 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
         ))}
       </div>
 
-      <div className="grid grid-cols-3 gap-2 flex-1 content-start overflow-y-auto pb-20">
+      <div
+        className="grid grid-cols-3 gap-2 flex-1 content-start overflow-y-auto pb-20 hide-scrollbar"
+        onMouseDown={handleTouchStart}
+        onMouseUp={handleTouchEnd}
+        onMouseLeave={handleTouchEnd}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         {displayedRecipes.length > 0 ? (
           displayedRecipes.map((recipe) => (
             <div
               key={recipe.id}
-              className="flex flex-col items-center group cursor-pointer"
-              onClick={() => onRecipeClick(recipe)}
+              onClick={() => {
+                if (!isDeleteMode) onRecipeClick(recipe);
+              }}
+              className={`flex flex-col items-center group cursor-pointer relative ${isDeleteMode ? 'animate-shake' : ''}`}
             >
+              {/* Delete Button Overlay */}
+              {isDeleteMode && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Call delete API
+                    softDeleteRecipe(recipe.id).then(() => {
+                      // Optimistic update
+                      setRecipes(prev => prev.filter(r => r.id !== recipe.id));
+                    });
+                  }}
+                  className="delete-btn absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full text-white flex items-center justify-center z-20 shadow-md animate-in zoom-in"
+                >
+                  <span className="font-bold text-xs">✕</span>
+                </button>
+              )}
+
               <div className={`relative w-full aspect-square rounded-[1.2rem] overflow-hidden mb-1 bg-[#fdf2e9] border-[1.5px] transition-all ${recipe.id === '5' ? 'border-blue-400 shadow-sm scale-105' : 'border-transparent'}`}>
                 <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent(recipe.image || '')}`} alt={recipe.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 {recipe.missingIngredients && recipe.missingIngredients.length > 0 ? (
@@ -232,15 +297,27 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
       </div>
 
       <div className="mt-4 mb-4 flex justify-center">
-        <button
-          onClick={handleRefresh}
-          className={`flex items-center gap-2 px-8 py-3 rounded-full font-bold text-base transition-all shadow-sm active:scale-95 ${displayedRecipes.length === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-            }`}
-          disabled={displayedRecipes.length === 0}
-        >
-          <RefreshCw size={20} />
-          换一组
-        </button>
+        <div className="mt-4 mb-4 flex justify-center items-center gap-6">
+          <button
+            onClick={handlePrev}
+            className={`flex items-center justify-center w-12 h-12 rounded-full bg-white shadow-md border border-gray-100 text-gray-600 hover:bg-gray-50 active:scale-95 transition-all ${displayedRecipes.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={displayedRecipes.length === 0}
+          >
+            <span className="text-xl font-bold">{'<'}</span>
+          </button>
+
+          <span className="text-sm font-medium text-gray-500">
+            {filteredRecipes.length > 0 ? `${currentPage + 1} / ${maxPage + 1}` : '0 / 0'}
+          </span>
+
+          <button
+            onClick={handleNext}
+            className={`flex items-center justify-center w-12 h-12 rounded-full bg-white shadow-md border border-gray-100 text-gray-600 hover:bg-gray-50 active:scale-95 transition-all ${displayedRecipes.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={displayedRecipes.length === 0}
+          >
+            <span className="text-xl font-bold">{'>'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Save Recipe Modal */}

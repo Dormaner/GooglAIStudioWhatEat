@@ -1,7 +1,7 @@
 import React from 'react';
-import { Heart, ChefHat, ShoppingCart, History } from 'lucide-react';
+import { Heart, ChefHat, ShoppingCart, History, Trash2 } from 'lucide-react';
 
-export type MenuOption = 'favorites' | 'cooking' | 'cart' | 'history';
+export type MenuOption = 'favorites' | 'cooking' | 'cart' | 'history' | 'recycle-bin';
 
 interface MenuGridProps {
     onOptionClick: (option: MenuOption) => void;
@@ -36,6 +36,13 @@ const MenuGrid: React.FC<MenuGridProps> = ({ onOptionClick }) => {
             icon: History,
             color: 'text-blue-500',
             bgColor: 'bg-blue-50',
+        },
+        {
+            id: 'recycle-bin' as MenuOption,
+            label: '菜谱回收站',
+            icon: Trash2,
+            color: 'text-gray-500',
+            bgColor: 'bg-gray-50',
         },
     ];
 

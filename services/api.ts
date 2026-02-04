@@ -38,6 +38,21 @@ export const deleteRecipe = async (id: string): Promise<{ message: string }> => 
     return response.data;
 };
 
+export const softDeleteRecipe = async (id: string): Promise<{ message: string }> => {
+    const response = await api.post(`/api/recipes/${id}/soft-delete`);
+    return response.data;
+};
+
+export const restoreRecipe = async (id: string): Promise<{ message: string }> => {
+    const response = await api.post(`/api/recipes/${id}/restore`);
+    return response.data;
+};
+
+export const fetchRecycleBin = async (): Promise<Recipe[]> => {
+    const response = await api.get('/api/recipes/recycle-bin/list');
+    return response.data;
+};
+
 // Ingredient APIs
 export interface IngredientsByCategory {
     vegetables: Array<{ id: string; name: string; category: string; icon?: string }>;

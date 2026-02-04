@@ -7,6 +7,7 @@ import MyFavorites from './MyFavorites';
 import MyCooking from './MyCooking';
 import BrowsingHistory from './BrowsingHistory';
 import ShoppingCart from './ShoppingCart';
+import RecycleBin from './RecycleBin';
 import { supabase } from '../config/supabase';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { Recipe } from '../types';
@@ -16,7 +17,7 @@ interface MeProps {
 }
 
 const Me: React.FC<MeProps> = ({ onRecipeClick = () => { } }) => {
-    const [view, setView] = useState<MenuOption | 'home' | 'login' | 'settings'>('home');
+    const [view, setView] = useState<MenuOption | 'home' | 'login' | 'settings' | 'recycle-bin'>('home');
     const [user, setUser] = useState<SupabaseUser | null>(null);
     const [mounted, setMounted] = useState(false);
 
@@ -82,6 +83,10 @@ const Me: React.FC<MeProps> = ({ onRecipeClick = () => { } }) => {
     if (view === 'cart') {
         // Creating placeholder until ShoppingCart is implemented
         return <div className="absolute inset-0 z-10 bg-white"><ShoppingCart onBack={() => setView('home')} /></div>;
+    }
+
+    if (view === 'recycle-bin') {
+        return <div className="absolute inset-0 z-10 bg-white"><RecycleBin onBack={() => setView('home')} /></div>;
     }
 
     return (

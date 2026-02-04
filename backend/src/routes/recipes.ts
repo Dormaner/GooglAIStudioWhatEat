@@ -18,7 +18,8 @@ router.get('/', async (req: Request, res: Response) => {
           ingredients (id, name, category, icon)
         )
       `)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .is('deleted_at', null); // Only fetch non-deleted recipes
 
         if (error) throw error;
 
@@ -59,6 +60,114 @@ router.get('/', async (req: Request, res: Response) => {
         res.json(formattedRecipes);
     } catch (error: any) {
         console.error('Error fetching recipes:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /api/recipes/:id/soft-delete - Soft delete a recipe
+router.post('/:id/soft-delete', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { error } = await supabase
+            .from('recipes')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', id);
+
+        if (error) throw error;
+        res.json({ message: 'Recipe soft deleted successfully' });
+    } catch (error: any) {
+        console.error('Error soft deleting recipe:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /api/recipes/:id/restore - Restore a soft-deleted recipe
+router.post('/:id/restore', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { error } = await supabase
+            .from('recipes')
+            .update({ deleted_at: null })
+            .eq('id', id);
+
+        if (error) throw error;
+        res.json({ message: 'Recipe restored successfully' });
+    } catch (error: any) {
+        console.error('Error restoring recipe:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET /api/recipes/recycle-bin - Get soft-deleted recipes (Auto-cleanup logic here)
+router.get('/recycle-bin/list', async (req: Request, res: Response) => {
+    try {
+        // 1. Auto-cleanup: Delete items older than 1 minute
+        const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
+
+        // This is "hard delete" logic for expired items
+        const { error: deleteError } = await supabase
+            .from('recipes')
+            .delete()
+            .lt('deleted_at', oneMinuteAgo)
+            .not('deleted_at', 'is', null);
+
+        if (deleteError) console.error('Auto-cleanup error:', deleteError);
+
+        // 2. Fetch remaining soft-deleted items
+        const { data: recipes, error } = await supabase
+            .from('recipes')
+            .select(`
+                *,
+                recipe_steps (*),
+                recipe_ingredients (
+                  amount,
+                  type,
+                  ingredients (id, name, category, icon)
+                )
+            `)
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Transform for frontend (reuse same logic as main list)
+        const formattedRecipes = recipes?.map(recipe => ({
+            id: recipe.id,
+            name: recipe.name,
+            image: recipe.image,
+            insight: recipe.insight || '',
+            link: recipe.link,
+            deletedAt: recipe.deleted_at, // Include deleted_at
+            ingredients: {
+                main: recipe.recipe_ingredients
+                    ?.filter((ri: any) => ri.type === 'main')
+                    .map((ri: any) => ({
+                        name: ri.ingredients.name,
+                        amount: ri.amount,
+                        status: 'stocked' as const
+                    })) || [],
+                condiments: recipe.recipe_ingredients
+                    ?.filter((ri: any) => ri.type === 'condiment')
+                    .map((ri: any) => ({
+                        name: ri.ingredients.name,
+                        amount: ri.amount,
+                        status: 'stocked' as const
+                    })) || []
+            },
+            steps: recipe.recipe_steps
+                ?.sort((a: any, b: any) => a.step_order - b.step_order)
+                .map((step: any) => ({
+                    title: step.title,
+                    description: step.description,
+                    image: step.image,
+                    videoUrl: step.video_url
+                })) || [],
+            missingIngredients: []
+        }));
+
+        res.json(formattedRecipes);
+    } catch (error: any) {
+        console.error('Error fetching recycle bin:', error);
         res.status(500).json({ error: error.message });
     }
 });

@@ -88,7 +88,7 @@ const ParsingButton: React.FC<ParsingButtonProps> = ({ parsingTasks, onOpenEdit,
                 <>
                     {/* Backdrop for mobile to click outside easily */}
                     <div className="fixed inset-0 z-40 bg-black/5" onClick={() => setIsDropdownOpen(false)} />
-                    <div className="fixed top-24 left-1/2 -translate-x-1/2 w-[85vw] max-w-[300px] max-h-[35vh] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-slide-down">
+                    <div className="fixed top-24 left-0 right-0 mx-auto w-[85vw] max-w-[300px] max-h-[35vh] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-slide-down">
                         <div className="p-4">
                             {/* Header */}
                             <div className="flex items-center justify-between mb-3">
