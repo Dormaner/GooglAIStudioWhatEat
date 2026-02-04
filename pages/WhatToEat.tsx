@@ -22,6 +22,7 @@ interface WhatToEatProps {
   setParsingTasks: (tasks: any) => void;
   editingTaskId: string | null;
   setEditingTaskId: (id: string | null) => void;
+  startParsingTask?: (url: string) => Promise<void>;
 }
 
 const WhatToEat: React.FC<WhatToEatProps> = ({
@@ -29,7 +30,8 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
   parsingTasks,
   setParsingTasks,
   editingTaskId,
-  setEditingTaskId
+  setEditingTaskId,
+  startParsingTask
 }) => {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -178,7 +180,7 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
   return (
     <div className="px-3 pt-14 h-full flex flex-col bg-white">
       <div className="flex justify-between items-center mb-4 px-1">
-        <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">今天吃什么</h1>
+        <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">吃什么</h1>
         <div className="flex items-center gap-2">
           {/* Parsing Button */}
           <ParsingButton
@@ -194,7 +196,10 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
 
           {/* Add Recipe Button */}
           <button
-            onClick={() => setIsSaveRecipeModalOpen(true)}
+            onClick={() => {
+              setEditingTaskId(null);
+              setIsSaveRecipeModalOpen(true);
+            }}
             className="flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-blue-100 transition-colors"
           >
             <Plus size={16} />
@@ -325,22 +330,31 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
         isOpen={isSaveRecipeModalOpen}
         onClose={() => setIsSaveRecipeModalOpen(false)}
         onSave={async (recipe) => {
+          // 1. Optimistic Update (Instant Feedback)
+          const optimisticRecipe = { ...recipe, id: 'temp_' + Date.now() };
+          setRecipes(prev => [optimisticRecipe, ...prev]);
+          setIsSaveRecipeModalOpen(false); // Close immediately
+
           try {
             const { saveCustomRecipe } = await import('../services/api');
             const { data: { user } } = await supabase.auth.getUser();
             const userId = user?.id || 'default-user';
 
             await saveCustomRecipe(recipe, userId);
-            // Silently save, no alert needed
-            loadRecipes(); // Reload recipes
+
+            // Reload to get real ID
+            loadRecipes();
           } catch (error) {
             console.error('Save failed:', error);
-            throw error;
+            // Revert optimistic update on error
+            setRecipes(prev => prev.filter(r => r.id !== optimisticRecipe.id));
+            alert('保存失败，请重试');
           }
         }}
         parsingTasks={parsingTasks}
         setParsingTasks={setParsingTasks}
         editingTaskId={editingTaskId}
+        startParsingTask={startParsingTask}
       />
     </div>
   );

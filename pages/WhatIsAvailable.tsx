@@ -27,6 +27,7 @@ interface WhatIsAvailableProps {
   setParsingTasks: (tasks: any) => void;
   editingTaskId: string | null;
   setEditingTaskId: (id: string | null) => void;
+  startParsingTask?: (url: string) => Promise<void>;
 }
 
 const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({
@@ -34,7 +35,8 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({
   parsingTasks,
   setParsingTasks,
   editingTaskId,
-  setEditingTaskId
+  setEditingTaskId,
+  startParsingTask
 }) => {
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>(['土豆', '胡萝卜', '鸡蛋']);
   const [ingredients, setIngredients] = useState<any>({ vegetables: [], meats: [], staples: [], condiments: [], kitchenware: [] });
@@ -308,7 +310,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({
       onTouchEnd={handleBackgroundTouchEnd}
     >
       <div className="flex justify-between items-center mb-10">
-        <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">今天吃什么</h1>
+        <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">有什么</h1>
         <div className="flex items-center gap-2">
           {/* Parsing Button (Edge-style) */}
           <ParsingButton
@@ -324,7 +326,10 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({
 
           {/* Add Recipe Button */}
           <button
-            onClick={() => setIsSaveRecipeModalOpen(true)}
+            onClick={() => {
+              setEditingTaskId(null);
+              setIsSaveRecipeModalOpen(true);
+            }}
             className="flex items-center gap-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-semibold hover:bg-blue-100 transition-colors"
           >
             <Plus size={18} />
@@ -521,6 +526,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({
           parsingTasks={parsingTasks}
           setParsingTasks={setParsingTasks}
           editingTaskId={editingTaskId}
+          startParsingTask={startParsingTask}
         />
       </div>
     </div >

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AppTab, Recipe, ViewMode } from './types';
 import WhatToEat from './pages/WhatToEat';
 import WhatIsAvailable from './pages/WhatIsAvailable';
@@ -9,6 +9,8 @@ import Me from './pages/Me';
 import { BackHandlerProvider, useBackHandler } from './contexts/BackHandlerContext';
 import ParsingProgressIndicator from './components/ParsingProgressIndicator';
 import ParsingCompleteToast from './components/ParsingCompleteToast';
+import { parseRecipeFromUrl } from './services/api';
+import { supabase } from './config/supabase';
 
 const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('what-to-eat');
@@ -28,6 +30,81 @@ const AppContent: React.FC = () => {
     estimatedTimeLeft?: string;
   }>>([]);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+
+  // Progress Simulation Effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setParsingTasks(prevTasks => {
+        if (!prevTasks.some(t => t.status === 'parsing')) return prevTasks;
+
+        return prevTasks.map(task => {
+          if (task.status !== 'parsing') return task;
+
+          // Simulate progress up to 90%
+          const currentPercent = task.progressPercent || 0;
+          if (currentPercent >= 90) return task;
+
+          const increment = Math.random() * 2; // Random increment
+          const newPercent = Math.min(90, currentPercent + increment);
+          const timeLeft = Math.max(0, 60 - Math.floor(newPercent * 0.6)); // Estimate
+
+          return {
+            ...task,
+            progressPercent: newPercent,
+            estimatedTimeLeft: `${timeLeft}秒`
+          };
+        });
+      });
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const startParsingTask = useCallback(async (url: string) => {
+    const taskId = `task_${Date.now()}`;
+
+    // 1. Add Task
+    setParsingTasks(prev => [...prev, {
+      id: taskId,
+      url,
+      status: 'parsing',
+      progress: '正在初始化...',
+      progressPercent: 0,
+      estimatedTimeLeft: '60秒'
+    }]);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || 'default-user';
+
+      // 2. Start API
+      const result = await parseRecipeFromUrl(url, userId);
+
+      // 3. Success
+      setParsingTasks(prev => prev.map(t =>
+        t.id === taskId ? {
+          ...t,
+          status: 'success',
+          progress: '完成',
+          progressPercent: 100,
+          result: result,
+          estimatedTimeLeft: undefined
+        } : t
+      ));
+
+    } catch (error: any) {
+      // 4. Error
+      console.error("Parsing failed", error);
+      setParsingTasks(prev => prev.map(t =>
+        t.id === taskId ? {
+          ...t,
+          status: 'error',
+          progress: '失败',
+          error: error.message || 'Unknown error',
+          progressPercent: 0
+        } : t
+      ));
+    }
+  }, []);
 
   // Native Back Button Handling (Prioritized Overlays)
   useBackHandler(() => {
@@ -81,6 +158,7 @@ const AppContent: React.FC = () => {
               setParsingTasks={setParsingTasks}
               editingTaskId={editingTaskId}
               setEditingTaskId={setEditingTaskId}
+              startParsingTask={startParsingTask}
             />
           </div>
           {/* Always keep WhatIsAvailable mounted to preserve state */}
@@ -91,6 +169,7 @@ const AppContent: React.FC = () => {
               setParsingTasks={setParsingTasks}
               editingTaskId={editingTaskId}
               setEditingTaskId={setEditingTaskId}
+              startParsingTask={startParsingTask}
             />
           </div>
           {activeTab === 'me' && <Me onRecipeClick={handleRecipeClick} />}
