@@ -7,12 +7,23 @@ import CookingMode from './pages/CookingMode';
 import Navbar from './components/Navbar';
 import Me from './pages/Me';
 import { BackHandlerProvider, useBackHandler } from './contexts/BackHandlerContext';
+import ParsingProgressIndicator from './components/ParsingProgressIndicator';
+import ParsingCompleteToast from './components/ParsingCompleteToast';
 
 const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('what-to-eat');
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('video');
   const [isCooking, setIsCooking] = useState(false);
+
+  // Global Parsing State
+  const [parsingTask, setParsingTask] = useState<{
+    url: string;
+    status: 'parsing' | 'success' | 'error';
+    progress: string;
+    result?: any;
+    error?: string;
+  } | null>(null);
 
   // Native Back Button Handling (Prioritized Overlays)
   useBackHandler(() => {
@@ -95,6 +106,37 @@ const AppContent: React.FC = () => {
 
       {!selectedRecipe && !isCooking && (
         <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+      )}
+
+      {/* Background Parsing Progress Indicator */}
+      {parsingTask && parsingTask.status === 'parsing' && (
+        <ParsingProgressIndicator
+          url={parsingTask.url}
+          progress={parsingTask.progress}
+          onCancel={() => setParsingTask(null)}
+        />
+      )}
+
+      {/* Parsing Complete Toast */}
+      {parsingTask && parsingTask.status === 'success' && (
+        <ParsingCompleteToast
+          status="success"
+          recipeName={parsingTask.result?.name}
+          onEdit={() => {
+            // TODO: Open SaveRecipeModal with parsed result
+            console.log('Open edit modal with:', parsingTask.result);
+          }}
+          onClose={() => setParsingTask(null)}
+        />
+      )}
+
+      {/* Parsing Error Toast */}
+      {parsingTask && parsingTask.status === 'error' && (
+        <ParsingCompleteToast
+          status="error"
+          error={parsingTask.error}
+          onClose={() => setParsingTask(null)}
+        />
       )}
     </div>
   );

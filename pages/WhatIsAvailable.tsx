@@ -9,6 +9,7 @@ import AddIngredientModal from '../components/AddIngredientModal';
 import IngredientSection from '../components/IngredientSection';
 import VariantSelectionModal from '../components/VariantSelectionModal';
 import SaveRecipeModal from '../components/SaveRecipeModal';
+import ParsingButton from '../components/ParsingButton';
 import { useBackHandler } from '../contexts/BackHandlerContext';
 
 interface WhatIsAvailableProps {
@@ -32,6 +33,19 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
 
   // Save Recipe Modal State
   const [isSaveRecipeModalOpen, setIsSaveRecipeModalOpen] = useState(false);
+
+  // Global Parsing State - Support multiple tasks
+  const [parsingTasks, setParsingTasks] = useState<Array<{
+    id: string;
+    url: string;
+    status: 'parsing' | 'success' | 'error';
+    progress: string;
+    result?: any;
+    error?: string;
+  }>>([]);
+
+  // Track which task to edit when modal opens
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
 
 
@@ -287,13 +301,28 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
     >
       <div className="flex justify-between items-center mb-10">
         <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">今天吃什么</h1>
-        <button
-          onClick={() => setIsSaveRecipeModalOpen(true)}
-          className="flex items-center gap-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-semibold hover:bg-blue-100 transition-colors"
-        >
-          <Plus size={18} />
-          存新菜
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Parsing Button (Edge-style) */}
+          <ParsingButton
+            parsingTasks={parsingTasks}
+            onOpenEdit={(taskId) => {
+              setEditingTaskId(taskId);
+              setIsSaveRecipeModalOpen(true);
+            }}
+            onClearTask={(taskId) => {
+              setParsingTasks(prev => prev.filter(t => t.id !== taskId));
+            }}
+          />
+
+          {/* Add Recipe Button */}
+          <button
+            onClick={() => setIsSaveRecipeModalOpen(true)}
+            className="flex items-center gap-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-semibold hover:bg-blue-100 transition-colors"
+          >
+            <Plus size={18} />
+            存新菜
+          </button>
+        </div>
       </div>
 
       <div className="flex justify-end mb-4 gap-2">
@@ -482,6 +511,9 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
               throw error;
             }
           }}
+          parsingTasks={parsingTasks}
+          setParsingTasks={setParsingTasks}
+          editingTaskId={editingTaskId}
         />
       </div>
     </div >

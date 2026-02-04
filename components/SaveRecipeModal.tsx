@@ -5,16 +5,34 @@ interface SaveRecipeModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (recipe: any) => void;
+    parsingTasks?: Array<{
+        id: string;
+        url: string;
+        status: 'parsing' | 'success' | 'error';
+        progress: string;
+        result?: any;
+        error?: string;
+    }>;
+    setParsingTasks?: (tasks: any) => void;
+    editingTaskId?: string | null;
 }
 
 type Platform = 'bilibili' | 'douyin' | 'xiaohongshu' | 'unknown';
 type ParseStatus = 'idle' | 'parsing' | 'success' | 'error';
 
-const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({ isOpen, onClose, onSave }) => {
+const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({
+    isOpen,
+    onClose,
+    onSave,
+    parsingTasks,
+    setParsingTasks,
+    editingTaskId
+}) => {
     const [url, setUrl] = useState('');
     const [platform, setPlatform] = useState<Platform>('unknown');
     const [parseStatus, setParseStatus] = useState<ParseStatus>('idle');
     const [parsedRecipe, setParsedRecipe] = useState<any>(null);
+    const [editableRecipe, setEditableRecipe] = useState<any>(null); // Track edits
     const [errorMessage, setErrorMessage] = useState('');
 
     // Detect platform from URL
@@ -45,6 +63,19 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({ isOpen, onClose, onSa
         setParseStatus('parsing');
         setErrorMessage('');
 
+        // Create new task with unique ID
+        const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // Add new task to global state
+        if (setParsingTasks) {
+            setParsingTasks((prev: any) => [...prev, {
+                id: taskId,
+                url,
+                status: 'parsing',
+                progress: '🎥 加载视频流...'
+            }]);
+        }
+
         try {
             const { parseRecipeFromUrl } = await import('../services/api');
 
@@ -53,33 +84,72 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({ isOpen, onClose, onSa
             const { data: { user } } = await supabase.auth.getUser();
             const userId = user?.id || 'default-user';
 
+            // Update progress
+            if (setParsingTasks) {
+                setParsingTasks((prev: any) => prev.map((t: any) =>
+                    t.id === taskId ? { ...t, progress: '🧠 Gemini 视觉分析中...' } : t
+                ));
+            }
+
             const result = await parseRecipeFromUrl(url, userId);
 
             setParsedRecipe(result);
+            setEditableRecipe(JSON.parse(JSON.stringify(result))); // Deep copy for editing
             setParseStatus('success');
+
+            // Update global state to success
+            if (setParsingTasks) {
+                setParsingTasks((prev: any) => prev.map((t: any) =>
+                    t.id === taskId ? { ...t, status: 'success', progress: '完成', result } : t
+                ));
+            }
         } catch (error: any) {
             console.error('Parse error:', error);
             setErrorMessage(error.message || 'AI解析失败,请重试');
             setParseStatus('error');
+
+            // Update global state to error
+            if (setParsingTasks) {
+                setParsingTasks((prev: any) => prev.map((t: any) =>
+                    t.id === taskId ? {
+                        ...t,
+                        status: 'error',
+                        progress: '失败',
+                        error: error.message || 'AI解析失败,请重试'
+                    } : t
+                ));
+            }
         }
     };
 
     const handleSaveRecipe = async () => {
-        if (!parsedRecipe) return;
+        if (!editableRecipe) return;
 
         try {
-            await onSave(parsedRecipe);
-            handleClose();
+            await onSave(editableRecipe); // Use edited data
+
+            // Clear the specific task from global state after save
+            if (setParsingTasks && editingTaskId) {
+                setParsingTasks((prev: any) => prev.filter((t: any) => t.id !== editingTaskId));
+            }
+
+            // Force close after a short delay to ensure save completes
+            setTimeout(() => {
+                handleClose();
+            }, 100);
         } catch (error) {
+            console.error('Save error:', error);
             setErrorMessage('保存失败,请重试');
         }
     };
 
     const handleClose = () => {
+        // Only clear local state, preserve global parsing state if parsing
         setUrl('');
         setPlatform('unknown');
         setParseStatus('idle');
         setParsedRecipe(null);
+        setEditableRecipe(null);
         setErrorMessage('');
         onClose();
     };
@@ -158,13 +228,21 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({ isOpen, onClose, onSa
                             <Loader2 className="animate-spin text-blue-500" size={48} />
                             <div className="text-center">
                                 <p className="font-bold text-lg text-gray-800">AI 正在深度解析视频...</p>
-                                <p className="text-sm text-gray-500 mt-1">这可能需要 30-60 秒,请耐心等待</p>
+                                <p className="text-sm text-gray-500 mt-1">这可能需要 30-60 秒</p>
+                                <p className="text-xs text-blue-600 mt-2">💡 您可以关闭此窗口继续浏览，解析完成后会自动显示</p>
                                 <div className="mt-4 space-y-2 text-xs text-gray-400">
-                                    <p>🎥 下载视频流...</p>
+                                    <p>🎥 加载视频流...</p>
                                     <p>🧠 Gemini 视觉分析中...</p>
                                     <p>📸 提取关键步骤截图...</p>
                                 </div>
                             </div>
+                            {/* Allow closing during parsing */}
+                            <button
+                                onClick={handleClose}
+                                className="mt-4 px-6 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                关闭窗口（后台继续解析）
+                            </button>
                         </div>
                     )}
 
@@ -176,36 +254,98 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({ isOpen, onClose, onSa
                                 <span className="font-semibold">解析成功!</span>
                             </div>
 
-                            {/* Recipe Name */}
+                            {/* Recipe Name - Editable */}
                             <div>
                                 <label className="text-xs text-gray-500 font-semibold">菜名</label>
-                                <p className="text-lg font-bold text-gray-800 mt-1">{parsedRecipe.name}</p>
+                                <input
+                                    type="text"
+                                    value={editableRecipe?.name || ''}
+                                    onChange={(e) => setEditableRecipe({ ...editableRecipe, name: e.target.value })}
+                                    className="text-lg font-bold text-gray-800 mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="输入菜名"
+                                />
                             </div>
 
-                            {/* Ingredients */}
+                            {/* Ingredients - Editable */}
                             <div>
                                 <label className="text-xs text-gray-500 font-semibold">食材</label>
-                                <div className="mt-2 space-y-2">
-                                    {parsedRecipe.ingredients?.main?.length > 0 && (
+                                <div className="mt-2 space-y-3">
+                                    {/* Main Ingredients */}
+                                    {editableRecipe?.ingredients?.main?.length > 0 && (
                                         <div>
-                                            <p className="text-sm font-semibold text-gray-700">主料:</p>
-                                            <div className="flex flex-wrap gap-2 mt-1">
-                                                {parsedRecipe.ingredients.main.map((ing: any, idx: number) => (
-                                                    <span key={idx} className="text-xs bg-white px-3 py-1 rounded-full border border-gray-200">
-                                                        {ing.name} {ing.amount}
-                                                    </span>
+                                            <p className="text-sm font-semibold text-gray-700 mb-2">主料:</p>
+                                            <div className="space-y-2">
+                                                {editableRecipe.ingredients.main.map((ing: any, idx: number) => (
+                                                    <div key={idx} className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={ing.name}
+                                                            onChange={(e) => {
+                                                                const newMain = [...editableRecipe.ingredients.main];
+                                                                newMain[idx] = { ...newMain[idx], name: e.target.value };
+                                                                setEditableRecipe({
+                                                                    ...editableRecipe,
+                                                                    ingredients: { ...editableRecipe.ingredients, main: newMain }
+                                                                });
+                                                            }}
+                                                            className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            placeholder="食材名称"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={ing.amount}
+                                                            onChange={(e) => {
+                                                                const newMain = [...editableRecipe.ingredients.main];
+                                                                newMain[idx] = { ...newMain[idx], amount: e.target.value };
+                                                                setEditableRecipe({
+                                                                    ...editableRecipe,
+                                                                    ingredients: { ...editableRecipe.ingredients, main: newMain }
+                                                                });
+                                                            }}
+                                                            className="w-24 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            placeholder="用量"
+                                                        />
+                                                    </div>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
-                                    {parsedRecipe.ingredients?.condiments?.length > 0 && (
+                                    {/* Condiments */}
+                                    {editableRecipe?.ingredients?.condiments?.length > 0 && (
                                         <div>
-                                            <p className="text-sm font-semibold text-gray-700">调料:</p>
-                                            <div className="flex flex-wrap gap-2 mt-1">
-                                                {parsedRecipe.ingredients.condiments.map((ing: any, idx: number) => (
-                                                    <span key={idx} className="text-xs bg-white px-3 py-1 rounded-full border border-gray-200">
-                                                        {ing.name} {ing.amount}
-                                                    </span>
+                                            <p className="text-sm font-semibold text-gray-700 mb-2">调料:</p>
+                                            <div className="space-y-2">
+                                                {editableRecipe.ingredients.condiments.map((ing: any, idx: number) => (
+                                                    <div key={idx} className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={ing.name}
+                                                            onChange={(e) => {
+                                                                const newCondiments = [...editableRecipe.ingredients.condiments];
+                                                                newCondiments[idx] = { ...newCondiments[idx], name: e.target.value };
+                                                                setEditableRecipe({
+                                                                    ...editableRecipe,
+                                                                    ingredients: { ...editableRecipe.ingredients, condiments: newCondiments }
+                                                                });
+                                                            }}
+                                                            className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            placeholder="调料名称"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={ing.amount}
+                                                            onChange={(e) => {
+                                                                const newCondiments = [...editableRecipe.ingredients.condiments];
+                                                                newCondiments[idx] = { ...newCondiments[idx], amount: e.target.value };
+                                                                setEditableRecipe({
+                                                                    ...editableRecipe,
+                                                                    ingredients: { ...editableRecipe.ingredients, condiments: newCondiments }
+                                                                });
+                                                            }}
+                                                            className="w-24 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            placeholder="用量"
+                                                        />
+                                                    </div>
                                                 ))}
                                             </div>
                                         </div>
@@ -213,11 +353,11 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({ isOpen, onClose, onSa
                                 </div>
                             </div>
 
-                            {/* Steps Preview */}
+                            {/* Steps Preview - Editable */}
                             <div>
-                                <label className="text-xs text-gray-500 font-semibold">步骤 ({parsedRecipe.steps?.length || 0})</label>
+                                <label className="text-xs text-gray-500 font-semibold">步骤 ({editableRecipe?.steps?.length || 0})</label>
                                 <div className="mt-2 space-y-3 max-h-80 overflow-y-auto">
-                                    {parsedRecipe.steps?.map((step: any, idx: number) => (
+                                    {editableRecipe?.steps?.map((step: any, idx: number) => (
                                         <div key={idx} className="flex gap-3 text-sm bg-white p-3 rounded-lg border border-gray-200">
                                             {/* Step Image Preview */}
                                             {step.image && (
@@ -225,9 +365,31 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({ isOpen, onClose, onSa
                                                     <img src={`${import.meta.env.VITE_API_URL}/api/image?url=${encodeURIComponent(step.image)}`} className="w-full h-full object-cover" alt={`Step ${idx + 1}`} />
                                                 </div>
                                             )}
-                                            <div>
-                                                <span className="font-semibold text-gray-700 block mb-1">步骤 {idx + 1}: {step.title}</span>
-                                                <p className="text-gray-600 text-xs leading-relaxed">{step.description}</p>
+                                            <div className="flex-1 space-y-2">
+                                                {/* Editable Step Title */}
+                                                <input
+                                                    type="text"
+                                                    value={step.title || ''}
+                                                    onChange={(e) => {
+                                                        const newSteps = [...editableRecipe.steps];
+                                                        newSteps[idx] = { ...newSteps[idx], title: e.target.value };
+                                                        setEditableRecipe({ ...editableRecipe, steps: newSteps });
+                                                    }}
+                                                    className="w-full font-semibold text-gray-700 px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    placeholder={`步骤 ${idx + 1} 标题`}
+                                                />
+                                                {/* Editable Step Description */}
+                                                <textarea
+                                                    value={step.description || ''}
+                                                    onChange={(e) => {
+                                                        const newSteps = [...editableRecipe.steps];
+                                                        newSteps[idx] = { ...newSteps[idx], description: e.target.value };
+                                                        setEditableRecipe({ ...editableRecipe, steps: newSteps });
+                                                    }}
+                                                    className="w-full text-gray-600 text-xs leading-relaxed px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                                    rows={2}
+                                                    placeholder="步骤描述"
+                                                />
                                             </div>
                                         </div>
                                     ))}
