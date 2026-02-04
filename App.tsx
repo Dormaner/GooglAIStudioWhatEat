@@ -16,14 +16,18 @@ const AppContent: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('video');
   const [isCooking, setIsCooking] = useState(false);
 
-  // Global Parsing State
-  const [parsingTask, setParsingTask] = useState<{
+  // Global Parsing State - Support multiple tasks
+  const [parsingTasks, setParsingTasks] = useState<Array<{
+    id: string;
     url: string;
     status: 'parsing' | 'success' | 'error';
     progress: string;
     result?: any;
     error?: string;
-  } | null>(null);
+    progressPercent?: number;
+    estimatedTimeLeft?: string;
+  }>>([]);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
   // Native Back Button Handling (Prioritized Overlays)
   useBackHandler(() => {
@@ -70,10 +74,24 @@ const AppContent: React.FC = () => {
       <div className="flex-1 overflow-y-auto pb-20 hide-scrollbar scroll-smooth">
         {/* Main Tab Views - Keep mounted but hidden when detail is open */}
         <div className={selectedRecipe ? 'hidden' : 'block h-full'}>
-          {activeTab === 'what-to-eat' && <WhatToEat onRecipeClick={handleRecipeClick} />}
+          {activeTab === 'what-to-eat' && (
+            <WhatToEat
+              onRecipeClick={handleRecipeClick}
+              parsingTasks={parsingTasks}
+              setParsingTasks={setParsingTasks}
+              editingTaskId={editingTaskId}
+              setEditingTaskId={setEditingTaskId}
+            />
+          )}
           {/* Always keep WhatIsAvailable mounted to preserve state */}
           <div className={activeTab === 'what-is-available' ? 'block' : 'hidden'}>
-            <WhatIsAvailable onRecipeClick={handleRecipeClick} />
+            <WhatIsAvailable
+              onRecipeClick={handleRecipeClick}
+              parsingTasks={parsingTasks}
+              setParsingTasks={setParsingTasks}
+              editingTaskId={editingTaskId}
+              setEditingTaskId={setEditingTaskId}
+            />
           </div>
           {activeTab === 'me' && <Me onRecipeClick={handleRecipeClick} />}
 
@@ -108,36 +126,7 @@ const AppContent: React.FC = () => {
         <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
       )}
 
-      {/* Background Parsing Progress Indicator */}
-      {parsingTask && parsingTask.status === 'parsing' && (
-        <ParsingProgressIndicator
-          url={parsingTask.url}
-          progress={parsingTask.progress}
-          onCancel={() => setParsingTask(null)}
-        />
-      )}
 
-      {/* Parsing Complete Toast */}
-      {parsingTask && parsingTask.status === 'success' && (
-        <ParsingCompleteToast
-          status="success"
-          recipeName={parsingTask.result?.name}
-          onEdit={() => {
-            // TODO: Open SaveRecipeModal with parsed result
-            console.log('Open edit modal with:', parsingTask.result);
-          }}
-          onClose={() => setParsingTask(null)}
-        />
-      )}
-
-      {/* Parsing Error Toast */}
-      {parsingTask && parsingTask.status === 'error' && (
-        <ParsingCompleteToast
-          status="error"
-          error={parsingTask.error}
-          onClose={() => setParsingTask(null)}
-        />
-      )}
     </div>
   );
 };

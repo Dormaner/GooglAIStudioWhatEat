@@ -14,9 +14,28 @@ import { useBackHandler } from '../contexts/BackHandlerContext';
 
 interface WhatIsAvailableProps {
   onRecipeClick: (recipe: Recipe) => void;
+  parsingTasks: Array<{
+    id: string;
+    url: string;
+    status: 'parsing' | 'success' | 'error';
+    progress: string;
+    result?: any;
+    error?: string;
+    progressPercent?: number;
+    estimatedTimeLeft?: string;
+  }>;
+  setParsingTasks: (tasks: any) => void;
+  editingTaskId: string | null;
+  setEditingTaskId: (id: string | null) => void;
 }
 
-const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
+const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({
+  onRecipeClick,
+  parsingTasks,
+  setParsingTasks,
+  editingTaskId,
+  setEditingTaskId
+}) => {
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>(['土豆', '胡萝卜', '鸡蛋']);
   const [ingredients, setIngredients] = useState<any>({ vegetables: [], meats: [], staples: [], condiments: [], kitchenware: [] });
   const [showPantry, setShowPantry] = useState(false);
@@ -34,18 +53,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
   // Save Recipe Modal State
   const [isSaveRecipeModalOpen, setIsSaveRecipeModalOpen] = useState(false);
 
-  // Global Parsing State - Support multiple tasks
-  const [parsingTasks, setParsingTasks] = useState<Array<{
-    id: string;
-    url: string;
-    status: 'parsing' | 'success' | 'error';
-    progress: string;
-    result?: any;
-    error?: string;
-  }>>([]);
 
-  // Track which task to edit when modal opens
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
 
 

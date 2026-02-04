@@ -86,8 +86,9 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({
         // Progress simulation interval
         const progressInterval = setInterval(() => {
             const elapsed = (Date.now() - startTime) / 1000; // seconds
-            // Simulate progress: fast at first, then slow down
-            currentProgress = Math.min(95, Math.round((elapsed / estimatedTotalTime) * 100 * 0.8 + Math.random() * 5));
+            // Simulate progress: ensure monotonic increase
+            const calculatedProgress = Math.min(95, Math.round((elapsed / estimatedTotalTime) * 95));
+            currentProgress = Math.max(currentProgress, calculatedProgress); // Prevent regression
             const timeLeft = Math.max(0, estimatedTotalTime - Math.round(elapsed));
 
             if (setParsingTasks) {

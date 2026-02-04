@@ -83,95 +83,99 @@ const ParsingButton: React.FC<ParsingButtonProps> = ({ parsingTasks, onOpenEdit,
                 <ChevronDown size={14} className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* Dropdown List */}
+            {/* Dropdown List - Centered Fixed Position */}
             {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-80 max-h-[70vh] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-slide-down">
-                    <div className="p-4">
-                        {/* Header */}
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className="font-bold text-gray-800">解析任务</h3>
-                            {parsingTasks.some(t => t.status !== 'parsing') && (
-                                <button
-                                    onClick={() => {
-                                        parsingTasks.forEach(t => {
-                                            if (t.status !== 'parsing') {
-                                                onClearTask(t.id);
-                                            }
-                                        });
-                                        setIsDropdownOpen(false);
-                                    }}
-                                    className="text-xs text-gray-500 hover:text-gray-700"
-                                >
-                                    清除全部
-                                </button>
-                            )}
-                        </div>
+                <>
+                    {/* Backdrop for mobile to click outside easily */}
+                    <div className="fixed inset-0 z-40 bg-black/5" onClick={() => setIsDropdownOpen(false)} />
+                    <div className="fixed top-24 left-1/2 -translate-x-1/2 w-[85vw] max-w-[300px] max-h-[35vh] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-slide-down">
+                        <div className="p-4">
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-bold text-gray-800">解析任务</h3>
+                                {parsingTasks.some(t => t.status !== 'parsing') && (
+                                    <button
+                                        onClick={() => {
+                                            parsingTasks.forEach(t => {
+                                                if (t.status !== 'parsing') {
+                                                    onClearTask(t.id);
+                                                }
+                                            });
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        className="text-xs text-gray-500 hover:text-gray-700"
+                                    >
+                                        清除全部
+                                    </button>
+                                )}
+                            </div>
 
-                        {/* Task List - Scrollable */}
-                        <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                            {parsingTasks.map((task) => (
-                                <div key={task.id} className="bg-gray-50 rounded-lg p-3 space-y-2">
-                                    {/* Status Icon + Name */}
-                                    <div className="flex items-start gap-2">
-                                        <div className="mt-0.5">
-                                            {task.status === 'parsing' && <CircularProgress progress={task.progressPercent || 0} size={20} strokeWidth={2} />}
-                                            {task.status === 'success' && <CheckCircle2 className="text-green-500" size={20} />}
-                                            {task.status === 'error' && <AlertCircle className="text-red-500" size={20} />}
+                            {/* Task List - Scrollable */}
+                            <div className="space-y-3 max-h-[30vh] overflow-y-auto">
+                                {parsingTasks.map((task) => (
+                                    <div key={task.id} className="bg-gray-50 rounded-lg p-3 space-y-2">
+                                        {/* Status Icon + Name */}
+                                        <div className="flex items-start gap-2">
+                                            <div className="mt-0.5">
+                                                {task.status === 'parsing' && <CircularProgress progress={task.progressPercent || 0} size={20} strokeWidth={2} />}
+                                                {task.status === 'success' && <CheckCircle2 className="text-green-500" size={20} />}
+                                                {task.status === 'error' && <AlertCircle className="text-red-500" size={20} />}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-semibold text-sm text-gray-800 truncate">
+                                                    {task.result?.name || '正在解析...'}
+                                                </p>
+                                                <p className="text-xs text-gray-500 truncate">{task.url}</p>
+                                            </div>
+                                            {task.status !== 'parsing' && (
+                                                <button
+                                                    onClick={() => onClearTask(task.id)}
+                                                    className="text-xs text-gray-400 hover:text-gray-600"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-semibold text-sm text-gray-800 truncate">
-                                                {task.result?.name || '正在解析...'}
-                                            </p>
-                                            <p className="text-xs text-gray-500 truncate">{task.url}</p>
-                                        </div>
-                                        {task.status !== 'parsing' && (
+
+                                        {/* Progress or Status */}
+                                        {task.status === 'parsing' && (
+                                            <div className="space-y-1">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-xs text-gray-600">{task.progress}</p>
+                                                    {task.estimatedTimeLeft && (
+                                                        <p className="text-xs text-gray-500">剩余 {task.estimatedTimeLeft}</p>
+                                                    )}
+                                                </div>
+                                                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                                    <div
+                                                        className="bg-blue-500 h-full rounded-full transition-all duration-300"
+                                                        style={{ width: `${task.progressPercent || 0}%` }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {task.status === 'success' && (
                                             <button
-                                                onClick={() => onClearTask(task.id)}
-                                                className="text-xs text-gray-400 hover:text-gray-600"
+                                                onClick={() => {
+                                                    onOpenEdit(task.id);
+                                                    setIsDropdownOpen(false);
+                                                }}
+                                                className="w-full px-3 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg hover:bg-green-600 transition-colors"
                                             >
-                                                ✕
+                                                点击编辑并保存
                                             </button>
                                         )}
+
+                                        {task.status === 'error' && (
+                                            <p className="text-xs text-red-600">{task.error}</p>
+                                        )}
                                     </div>
-
-                                    {/* Progress or Status */}
-                                    {task.status === 'parsing' && (
-                                        <div className="space-y-1">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-xs text-gray-600">{task.progress}</p>
-                                                {task.estimatedTimeLeft && (
-                                                    <p className="text-xs text-gray-500">剩余 {task.estimatedTimeLeft}</p>
-                                                )}
-                                            </div>
-                                            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                                <div
-                                                    className="bg-blue-500 h-full rounded-full transition-all duration-300"
-                                                    style={{ width: `${task.progressPercent || 0}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {task.status === 'success' && (
-                                        <button
-                                            onClick={() => {
-                                                onOpenEdit(task.id);
-                                                setIsDropdownOpen(false);
-                                            }}
-                                            className="w-full px-3 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg hover:bg-green-600 transition-colors"
-                                        >
-                                            点击编辑并保存
-                                        </button>
-                                    )}
-
-                                    {task.status === 'error' && (
-                                        <p className="text-xs text-red-600">{task.error}</p>
-                                    )}
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
+                </>
             )}
         </div>
     );

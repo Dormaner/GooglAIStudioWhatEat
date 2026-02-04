@@ -3,12 +3,34 @@ import React, { useState, useEffect } from 'react';
 import { Plus, RefreshCw, Loader2, Search } from 'lucide-react';
 import { fetchRecipes } from '../services/api';
 import { Recipe } from '../types';
+import ParsingButton from '../components/ParsingButton';
+import SaveRecipeModal from '../components/SaveRecipeModal';
+import { supabase } from '../config/supabase';
 
 interface WhatToEatProps {
   onRecipeClick: (recipe: Recipe) => void;
+  parsingTasks: Array<{
+    id: string;
+    url: string;
+    status: 'parsing' | 'success' | 'error';
+    progress: string;
+    result?: any;
+    error?: string;
+    progressPercent?: number;
+    estimatedTimeLeft?: string;
+  }>;
+  setParsingTasks: (tasks: any) => void;
+  editingTaskId: string | null;
+  setEditingTaskId: (id: string | null) => void;
 }
 
-const WhatToEat: React.FC<WhatToEatProps> = ({ onRecipeClick }) => {
+const WhatToEat: React.FC<WhatToEatProps> = ({
+  onRecipeClick,
+  parsingTasks,
+  setParsingTasks,
+  editingTaskId,
+  setEditingTaskId
+}) => {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +38,9 @@ const WhatToEat: React.FC<WhatToEatProps> = ({ onRecipeClick }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const RECIPES_PER_PAGE = 9;
+
+  // Modal state
+  const [isSaveRecipeModalOpen, setIsSaveRecipeModalOpen] = useState(false);
 
   const CATEGORIES = [
     { name: '全部', keywords: [] },
@@ -115,10 +140,28 @@ const WhatToEat: React.FC<WhatToEatProps> = ({ onRecipeClick }) => {
     <div className="px-3 pt-14 h-full flex flex-col bg-white">
       <div className="flex justify-between items-center mb-4 px-1">
         <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">今天吃什么</h1>
-        <button className="flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-blue-100 transition-colors">
-          <Plus size={16} />
-          存新菜
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Parsing Button */}
+          <ParsingButton
+            parsingTasks={parsingTasks}
+            onOpenEdit={(taskId) => {
+              setEditingTaskId(taskId);
+              setIsSaveRecipeModalOpen(true);
+            }}
+            onClearTask={(taskId) => {
+              setParsingTasks(prev => prev.filter(t => t.id !== taskId));
+            }}
+          />
+
+          {/* Add Recipe Button */}
+          <button
+            onClick={() => setIsSaveRecipeModalOpen(true)}
+            className="flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-blue-100 transition-colors"
+          >
+            <Plus size={16} />
+            存新菜
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -199,6 +242,29 @@ const WhatToEat: React.FC<WhatToEatProps> = ({ onRecipeClick }) => {
           换一组
         </button>
       </div>
+
+      {/* Save Recipe Modal */}
+      <SaveRecipeModal
+        isOpen={isSaveRecipeModalOpen}
+        onClose={() => setIsSaveRecipeModalOpen(false)}
+        onSave={async (recipe) => {
+          try {
+            const { saveCustomRecipe } = await import('../services/api');
+            const { data: { user } } = await supabase.auth.getUser();
+            const userId = user?.id || 'default-user';
+
+            await saveCustomRecipe(recipe, userId);
+            // Silently save, no alert needed
+            loadRecipes(); // Reload recipes
+          } catch (error) {
+            console.error('Save failed:', error);
+            throw error;
+          }
+        }}
+        parsingTasks={parsingTasks}
+        setParsingTasks={setParsingTasks}
+        editingTaskId={editingTaskId}
+      />
     </div>
   );
 };
