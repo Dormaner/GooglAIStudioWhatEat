@@ -178,7 +178,7 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
   return (
     <div className="px-3 pt-14 h-full flex flex-col bg-white">
       <div className="flex justify-between items-center mb-4 px-1">
-        <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">今天吃什么</h1>
+        <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">吃什么</h1>
         <div className="flex items-center gap-2">
           {/* Parsing Button */}
           <ParsingButton
@@ -194,7 +194,10 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
 
           {/* Add Recipe Button */}
           <button
-            onClick={() => setIsSaveRecipeModalOpen(true)}
+            onClick={() => {
+              setEditingTaskId(null);
+              setIsSaveRecipeModalOpen(true);
+            }}
             className="flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-blue-100 transition-colors"
           >
             <Plus size={16} />

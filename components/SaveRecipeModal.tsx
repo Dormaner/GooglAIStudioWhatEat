@@ -49,6 +49,28 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({
         setPlatform(detectPlatform(inputUrl));
     };
 
+    // Load data if editing
+    React.useEffect(() => {
+        if (isOpen && editingTaskId && parsingTasks) {
+            const task = parsingTasks.find(t => t.id === editingTaskId);
+            if (task && task.status === 'success' && task.result) {
+                setUrl(task.url);
+                setPlatform(detectPlatform(task.url));
+                setParsedRecipe(task.result);
+                setEditableRecipe(JSON.parse(JSON.stringify(task.result)));
+                setParseStatus('success');
+            }
+        } else if (isOpen && !editingTaskId) {
+            // Reset for new recipe
+            setUrl('');
+            setPlatform('unknown');
+            setParseStatus('idle');
+            setParsedRecipe(null);
+            setEditableRecipe(null);
+            setErrorMessage('');
+        }
+    }, [isOpen, editingTaskId, parsingTasks]);
+
     const handleParse = async () => {
         if (!url.trim()) {
             setErrorMessage('请输入链接');

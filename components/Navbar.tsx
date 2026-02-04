@@ -9,8 +9,8 @@ interface NavbarProps {
 
 const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
   const tabs = [
-    { id: 'what-to-eat' as AppTab, label: '今天吃什么', icon: ChefHat },
-    { id: 'what-is-available' as AppTab, label: '有什么食材', icon: Refrigerator },
+    { id: 'what-to-eat' as AppTab, label: '吃什么', icon: ChefHat },
+    { id: 'what-is-available' as AppTab, label: '有什么', icon: Refrigerator },
     { id: 'me' as AppTab, label: '我的', icon: User },
   ];
 
