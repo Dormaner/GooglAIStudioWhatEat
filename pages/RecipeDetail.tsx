@@ -535,16 +535,20 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
               </div>
             </div>
           ) : (mode === 'video' && isBilibili) ? (
-            // Bilibili Video Mode
-            <div className="w-full h-full relative">
-              <iframe
-                src={`//player.bilibili.com/player.html?bvid=${currentRecipe.id.replace('bili-', '')}&page=1&high_quality=1&danmaku=0`}
-                scrolling="no"
-                frameBorder="0"
-                allowFullScreen={true}
-                className="w-full h-full"
-                sandbox="allow-top-navigation allow-same-origin allow-forms allow-scripts"
-              ></iframe>
+            // Bilibili Video Mode (Cover Image Only - Fix for embedding issues)
+            <div className="w-full h-full relative group cursor-pointer" onClick={() => window.open(currentRecipe.link, '_blank')}>
+              <img
+                src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent(currentRecipe.image || '')}`}
+                className="w-full h-full object-cover"
+                alt="Video Cover"
+              />
+              <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-center text-white transition-colors group-hover:bg-black/40">
+                <div className="bg-white/20 p-4 rounded-full backdrop-blur-sm mb-2 shadow-xl ring-1 ring-white/30">
+                  <Play size={32} className="fill-white" />
+                </div>
+                <span className="font-bold text-sm tracking-wide">前往 Bilibili 观看视频</span>
+                <p className="text-xs text-white/70 mt-1 max-w-[80%] truncate">{currentRecipe.link}</p>
+              </div>
             </div>
           ) : (
             // Graphic Mode (Default for Xiachufang)

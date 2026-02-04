@@ -34,7 +34,12 @@ const AppContent: React.FC = () => {
 
   const handleRecipeClick = useCallback((recipe: Recipe) => {
     setSelectedRecipe(recipe);
-    setViewMode('video');
+
+    // Smart Mode Selection:
+    // - If recipe has steps (graphic content), default to 'graphic' mode
+    // - Otherwise (video-only), default to 'video' mode
+    const hasSteps = recipe.steps && recipe.steps.length > 0;
+    setViewMode(hasSteps ? 'graphic' : 'video');
   }, []);
 
   const handleBack = useCallback(() => {

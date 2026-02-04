@@ -200,3 +200,30 @@ export const checkAiIngredientStock = async (userIngredients: string[], recipeIn
 };
 
 export default api;
+
+// Recipe Parsing and Saving
+export const parseRecipeFromUrl = async (url: string, userId: string) => {
+    const response = await fetch(`${API_URL}/api/recipes/parse-from-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, userId })
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Parse failed');
+    }
+    return response.json();
+};
+
+export const saveCustomRecipe = async (recipe: any, userId: string) => {
+    const response = await fetch(`${API_URL}/api/recipes/save-custom`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipe, userId })
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Save failed');
+    }
+    return response.json();
+};

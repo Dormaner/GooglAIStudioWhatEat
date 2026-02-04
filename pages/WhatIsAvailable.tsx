@@ -8,6 +8,7 @@ import KitchenPantry from '../components/KitchenPantry';
 import AddIngredientModal from '../components/AddIngredientModal';
 import IngredientSection from '../components/IngredientSection';
 import VariantSelectionModal from '../components/VariantSelectionModal';
+import SaveRecipeModal from '../components/SaveRecipeModal';
 import { useBackHandler } from '../contexts/BackHandlerContext';
 
 interface WhatIsAvailableProps {
@@ -28,6 +29,9 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
   // Add Ingredient Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalCategory, setModalCategory] = useState('');
+
+  // Save Recipe Modal State
+  const [isSaveRecipeModalOpen, setIsSaveRecipeModalOpen] = useState(false);
 
 
 
@@ -283,7 +287,10 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
     >
       <div className="flex justify-between items-center mb-10">
         <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">今天吃什么</h1>
-        <button className="flex items-center gap-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-semibold">
+        <button
+          onClick={() => setIsSaveRecipeModalOpen(true)}
+          className="flex items-center gap-1 bg-blue-50 text-blue-600 px-4 py-2 rounded-full text-sm font-semibold hover:bg-blue-100 transition-colors"
+        >
           <Plus size={18} />
           存新菜
         </button>
@@ -456,6 +463,25 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
           onClose={() => setIsModalOpen(false)}
           onConfirm={handleAddIngredient}
           category={modalCategory}
+        />
+
+        <SaveRecipeModal
+          isOpen={isSaveRecipeModalOpen}
+          onClose={() => setIsSaveRecipeModalOpen(false)}
+          onSave={async (recipe) => {
+            try {
+              const { saveCustomRecipe } = await import('../services/api');
+              const { data: { user } } = await supabase.auth.getUser();
+              const userId = user?.id || 'default-user';
+
+              await saveCustomRecipe(recipe, userId);
+              alert('菜谱保存成功!');
+              // Optionally reload recipes or navigate
+            } catch (error) {
+              console.error('Save failed:', error);
+              throw error;
+            }
+          }}
         />
       </div>
     </div >
