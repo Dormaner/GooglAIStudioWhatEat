@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Loader2, CheckCircle2, AlertCircle, ChevronDown } from 'lucide-react';
+import CircularProgress from './CircularProgress';
 
 interface ParsingTask {
     id: string;
@@ -8,6 +9,8 @@ interface ParsingTask {
     progress: string;
     result?: any;
     error?: string;
+    progressPercent?: number; // 0-100
+    estimatedTimeLeft?: string; // e.g., "30秒"
 }
 
 interface ParsingButtonProps {
@@ -73,14 +76,16 @@ const ParsingButton: React.FC<ParsingButtonProps> = ({ parsingTasks, onOpenEdit,
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${getButtonColor()}`}
             >
-                {getIcon()}
+                {parsingCount > 0 ? (
+                    <CircularProgress progress={Math.round(parsingTasks.filter(t => t.status === 'parsing').reduce((sum, t) => sum + (t.progressPercent || 0), 0) / parsingCount)} size={18} strokeWidth={2} />
+                ) : getIcon()}
                 <span className="hidden sm:inline">{getButtonText()}</span>
                 <ChevronDown size={14} className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Dropdown List */}
             {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-80 max-h-96 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-slide-down">
+                <div className="absolute right-0 mt-2 w-80 max-h-[70vh] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 animate-slide-down">
                     <div className="p-4">
                         {/* Header */}
                         <div className="flex items-center justify-between mb-3">
@@ -103,13 +108,13 @@ const ParsingButton: React.FC<ParsingButtonProps> = ({ parsingTasks, onOpenEdit,
                         </div>
 
                         {/* Task List - Scrollable */}
-                        <div className="space-y-3 max-h-80 overflow-y-auto">
+                        <div className="space-y-3 max-h-[60vh] overflow-y-auto">
                             {parsingTasks.map((task) => (
                                 <div key={task.id} className="bg-gray-50 rounded-lg p-3 space-y-2">
                                     {/* Status Icon + Name */}
                                     <div className="flex items-start gap-2">
                                         <div className="mt-0.5">
-                                            {task.status === 'parsing' && <Loader2 className="animate-spin text-blue-500" size={20} />}
+                                            {task.status === 'parsing' && <CircularProgress progress={task.progressPercent || 0} size={20} strokeWidth={2} />}
                                             {task.status === 'success' && <CheckCircle2 className="text-green-500" size={20} />}
                                             {task.status === 'error' && <AlertCircle className="text-red-500" size={20} />}
                                         </div>
@@ -132,9 +137,17 @@ const ParsingButton: React.FC<ParsingButtonProps> = ({ parsingTasks, onOpenEdit,
                                     {/* Progress or Status */}
                                     {task.status === 'parsing' && (
                                         <div className="space-y-1">
-                                            <p className="text-xs text-gray-600">{task.progress}</p>
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-xs text-gray-600">{task.progress}</p>
+                                                {task.estimatedTimeLeft && (
+                                                    <p className="text-xs text-gray-500">剩余 {task.estimatedTimeLeft}</p>
+                                                )}
+                                            </div>
                                             <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                                                <div className="bg-blue-500 h-full rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                                                <div
+                                                    className="bg-blue-500 h-full rounded-full transition-all duration-300"
+                                                    style={{ width: `${task.progressPercent || 0}%` }}
+                                                ></div>
                                             </div>
                                         </div>
                                     )}

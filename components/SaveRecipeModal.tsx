@@ -66,15 +66,40 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({
         // Create new task with unique ID
         const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+        // Estimated total time: 60 seconds
+        const estimatedTotalTime = 60;
+        let currentProgress = 0;
+        let startTime = Date.now();
+
         // Add new task to global state
         if (setParsingTasks) {
             setParsingTasks((prev: any) => [...prev, {
                 id: taskId,
                 url,
                 status: 'parsing',
-                progress: '🎥 加载视频流...'
+                progress: '🎥 加载视频流...',
+                progressPercent: 0,
+                estimatedTimeLeft: '60秒'
             }]);
         }
+
+        // Progress simulation interval
+        const progressInterval = setInterval(() => {
+            const elapsed = (Date.now() - startTime) / 1000; // seconds
+            // Simulate progress: fast at first, then slow down
+            currentProgress = Math.min(95, Math.round((elapsed / estimatedTotalTime) * 100 * 0.8 + Math.random() * 5));
+            const timeLeft = Math.max(0, estimatedTotalTime - Math.round(elapsed));
+
+            if (setParsingTasks) {
+                setParsingTasks((prev: any) => prev.map((t: any) =>
+                    t.id === taskId ? {
+                        ...t,
+                        progressPercent: currentProgress,
+                        estimatedTimeLeft: timeLeft > 0 ? `${timeLeft}秒` : '即将完成...'
+                    } : t
+                ));
+            }
+        }, 1000);
 
         try {
             const { parseRecipeFromUrl } = await import('../services/api');
@@ -87,11 +112,18 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({
             // Update progress
             if (setParsingTasks) {
                 setParsingTasks((prev: any) => prev.map((t: any) =>
-                    t.id === taskId ? { ...t, progress: '🧠 Gemini 视觉分析中...' } : t
+                    t.id === taskId ? {
+                        ...t,
+                        progress: '🧠 Gemini 视觉分析中...',
+                        progressPercent: Math.max(currentProgress, 50)
+                    } : t
                 ));
             }
 
             const result = await parseRecipeFromUrl(url, userId);
+
+            // Clear interval
+            clearInterval(progressInterval);
 
             setParsedRecipe(result);
             setEditableRecipe(JSON.parse(JSON.stringify(result))); // Deep copy for editing
@@ -100,10 +132,20 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({
             // Update global state to success
             if (setParsingTasks) {
                 setParsingTasks((prev: any) => prev.map((t: any) =>
-                    t.id === taskId ? { ...t, status: 'success', progress: '完成', result } : t
+                    t.id === taskId ? {
+                        ...t,
+                        status: 'success',
+                        progress: '完成',
+                        result,
+                        progressPercent: 100,
+                        estimatedTimeLeft: undefined
+                    } : t
                 ));
             }
         } catch (error: any) {
+            // Clear interval
+            clearInterval(progressInterval);
+
             console.error('Parse error:', error);
             setErrorMessage(error.message || 'AI解析失败,请重试');
             setParseStatus('error');
@@ -115,7 +157,9 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({
                         ...t,
                         status: 'error',
                         progress: '失败',
-                        error: error.message || 'AI解析失败,请重试'
+                        error: error.message || 'AI解析失败,请重试',
+                        progressPercent: 0,
+                        estimatedTimeLeft: undefined
                     } : t
                 ));
             }

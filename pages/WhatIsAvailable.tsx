@@ -504,8 +504,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({ onRecipeClick }) => {
               const userId = user?.id || 'default-user';
 
               await saveCustomRecipe(recipe, userId);
-              alert('菜谱保存成功!');
-              // Optionally reload recipes or navigate
+              // Silently save, no alert needed
             } catch (error) {
               console.error('Save failed:', error);
               throw error;
