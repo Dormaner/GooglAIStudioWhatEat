@@ -74,7 +74,7 @@ const AppContent: React.FC = () => {
       <div className="flex-1 overflow-y-auto pb-20 hide-scrollbar scroll-smooth">
         {/* Main Tab Views - Keep mounted but hidden when detail is open */}
         <div className={selectedRecipe ? 'hidden' : 'block h-full'}>
-          {activeTab === 'what-to-eat' && (
+          <div className={activeTab === 'what-to-eat' ? 'block h-full' : 'hidden'}>
             <WhatToEat
               onRecipeClick={handleRecipeClick}
               parsingTasks={parsingTasks}
@@ -82,7 +82,7 @@ const AppContent: React.FC = () => {
               editingTaskId={editingTaskId}
               setEditingTaskId={setEditingTaskId}
             />
-          )}
+          </div>
           {/* Always keep WhatIsAvailable mounted to preserve state */}
           <div className={activeTab === 'what-is-available' ? 'block' : 'hidden'}>
             <WhatIsAvailable
