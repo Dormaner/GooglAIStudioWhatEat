@@ -52,55 +52,25 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({
         setPlatform(detectPlatform(inputUrl));
     };
 
-    // Load data if editing
-    // 1. Reset for new recipe (runs when opening or switching to new mode)
+    // Load data if editing or reset for new recipe
     React.useEffect(() => {
-        if (isOpen && !editingTaskId) {
+        if (isOpen && editingTaskId && parsingTasks) {
+            const task = parsingTasks.find(t => t.id === editingTaskId);
+            if (task && task.status === 'success' && task.result) {
+                setUrl(task.url);
+                setPlatform(detectPlatform(task.url));
+                setParsedRecipe(task.result);
+                setEditableRecipe(JSON.parse(JSON.stringify(task.result)));
+                setParseStatus('success');
+            }
+        } else if (isOpen && !editingTaskId) {
+            // Reset for new recipe
             setUrl('');
             setPlatform('unknown');
             setParseStatus('idle');
             setParsedRecipe(null);
             setEditableRecipe(null);
             setErrorMessage('');
-            setIsShrinking(false);
-        }
-    }, [isOpen, editingTaskId]);
-
-    // 2. Load data if editing (runs when tasks update or opening edit mode)
-    React.useEffect(() => {
-        if (isOpen && editingTaskId && parsingTasks) {
-            const task = parsingTasks.find(t => t.id === editingTaskId);
-            if (task && task.status === 'success' && task.result) {
-                const safeUrl = task.url || '';
-                setUrl(safeUrl);
-                setPlatform(detectPlatform(safeUrl));
-                setParsedRecipe(task.result);
-
-                // Safe data sanitization
-                const safeResult = task.result || {};
-
-                // Handle Ingredients: AI returns { main: [], condiments: [] }, but we need to handle it safely
-                let safeIngredients: any[] = [];
-                if (safeResult.ingredients && !Array.isArray(safeResult.ingredients)) {
-                    // Structure: { main: [...], condiments: [...] }
-                    const main = Array.isArray(safeResult.ingredients.main) ? safeResult.ingredients.main : [];
-                    const condiments = Array.isArray(safeResult.ingredients.condiments) ? safeResult.ingredients.condiments : [];
-                    safeIngredients = [...main, ...condiments];
-                } else if (Array.isArray(safeResult.ingredients)) {
-                    // Flat Array (Legacy)
-                    safeIngredients = safeResult.ingredients;
-                }
-
-                const safeSteps = Array.isArray(safeResult.steps) ? safeResult.steps : [];
-
-                setEditableRecipe({
-                    ...safeResult,
-                    name: safeResult.name || '',
-                    ingredients: { main: safeIngredients, condiments: [] }, // Normalize to structure for DB
-                    steps: safeSteps
-                });
-                setParseStatus('success');
-            }
         }
     }, [isOpen, editingTaskId, parsingTasks]);
 
