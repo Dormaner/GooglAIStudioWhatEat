@@ -1,4 +1,5 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
+import puppeteer, { Browser, Page } from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -9,23 +10,57 @@ import * as path from 'path';
 
 let browserInstance: Browser | null = null;
 
+// Helper to find local Chrome on Windows
+const getLocalChromePath = () => {
+    const paths = [
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe')
+    ];
+    for (const p of paths) {
+        return p;
+    }
+    return paths[0];
+};
+
 /**
  * Get or create a shared browser instance
  */
 async function getBrowser(): Promise<Browser> {
     if (!browserInstance) {
-        browserInstance = await puppeteer.launch({
-            headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--disable-blink-features=AutomationControlled',
-                '--disable-features=IsolateOrigins,site-per-process',
-                '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            ]
-        });
+        const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+
+        if (isProduction) {
+            console.log('[Puppeteer] Launching in Production (Serverless Chromium)...');
+            browserInstance = await puppeteer.launch({
+                args: chromium.args,
+                defaultViewport: chromium.defaultViewport,
+                executablePath: await chromium.executablePath(),
+                headless: chromium.headless,
+                ignoreHTTPSErrors: true,
+            } as any);
+        } else {
+            console.log('[Puppeteer] Launching in Development (Local Chrome)...');
+            const executablePath = getLocalChromePath();
+            console.log(`[Puppeteer] Using local executable: ${executablePath}`);
+
+            try {
+                browserInstance = await puppeteer.launch({
+                    executablePath,
+                    headless: true,
+                    args: [
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-gpu',
+                        '--disable-blink-features=AutomationControlled',
+                    ]
+                });
+            } catch (err) {
+                console.error('[Puppeteer] Failed to launch local Chrome.');
+                throw err;
+            }
+        }
     }
     return browserInstance;
 }
