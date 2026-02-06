@@ -68,8 +68,10 @@ export const BackHandlerProvider: React.FC<{ children: React.ReactNode }> = ({ c
         };
     }, []); // Bind once. Use ref for latest state.
 
+    const contextValue = React.useMemo(() => ({ register, unregister }), [register, unregister]);
+
     return (
-        <BackHandlerContext.Provider value={{ register, unregister }}>
+        <BackHandlerContext.Provider value={contextValue}>
             {children}
         </BackHandlerContext.Provider>
     );

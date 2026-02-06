@@ -340,10 +340,17 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
             const { data: { user } } = await supabase.auth.getUser();
             const userId = user?.id || 'default-user';
 
-            await saveCustomRecipe(recipe, userId);
+            const response = await saveCustomRecipe(recipe, userId);
 
-            // Reload to get real ID
-            loadRecipes();
+            // 2. Real Update: Swap temp ID with real ID (and update data if backend returned more info)
+            // (Note: response.id comes from the backend)
+            setRecipes(prev => prev.map(r =>
+              r.id === optimisticRecipe.id
+                ? { ...r, id: response.id, ...response } // Merge response data (like insight) if available
+                : r
+            ));
+
+            // loadRecipes(); // REMOVED: No more spinner refresh!
           } catch (error) {
             console.error('Save failed:', error);
             // Revert optimistic update on error
