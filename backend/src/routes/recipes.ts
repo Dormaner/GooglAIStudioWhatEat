@@ -756,12 +756,42 @@ router.post('/save-custom', async (req: Request, res: Response) => {
                 image: recipe.image || '',
                 link: recipe.source?.originalUrl || '',
                 insight: `来源: ${recipe.source?.platform || 'Unknown'} - ${recipe.source?.author || 'Unknown'}`,
-                created_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
+                user_id: (userId && userId !== 'default-user') ? userId : null
             })
             .select()
             .single();
 
-        if (recipeError) throw recipeError;
+        if (recipeError) {
+            // Handle duplicate link error (23505 is Postgres unique_violation)
+            if (recipeError.code === '23505' && recipeError.details?.includes('link')) {
+                console.log('[Save Custom] Recipe already exists (duplicate link). Fetching existing ID...');
+
+                const { data: existingRecipe, error: fetchError } = await supabase
+                    .from('recipes')
+                    .select('id')
+                    .eq('link', recipe.source?.originalUrl || '')
+                    .single();
+
+                if (existingRecipe) {
+                    // Update created_at to bring it to the top
+                    await supabase
+                        .from('recipes')
+                        .update({
+                            created_at: new Date().toISOString(),
+                            deleted_at: null
+                        })
+                        .eq('id', existingRecipe.id);
+
+                    // Return the existing recipe ID
+                    console.log(`[Save Custom] Returning existing recipe ID: ${existingRecipe.id}`);
+                    return res.json({ id: existingRecipe.id, message: 'Recipe already exists', isDuplicate: true });
+                }
+            }
+
+            // If not a duplicate error or fetch failed, throw original error
+            throw recipeError;
+        }
 
         const recipeId = newRecipe.id;
         console.log(`[Save Custom] Recipe created with ID: ${recipeId}`);

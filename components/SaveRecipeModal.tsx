@@ -52,28 +52,61 @@ const SaveRecipeModal: React.FC<SaveRecipeModalProps> = ({
         setPlatform(detectPlatform(inputUrl));
     };
 
-    // Load data if editing or reset for new recipe
+    const prevIsOpenRef = React.useRef(false);
+    const prevEditingIdRef = React.useRef<string | null>(null);
+
+    // Effect 1: Handle Modal Open / Close / Mode Switch (Reset State)
+    React.useEffect(() => {
+        const prevIsOpen = prevIsOpenRef.current;
+        const prevEditingId = prevEditingIdRef.current;
+
+        // If just opened OR switched mode (e.g. from null to some ID or vice versa)
+        if ((isOpen && !prevIsOpen) || (isOpen && editingTaskId !== prevEditingId)) {
+            if (editingTaskId) {
+                // Edit Mode: Load data
+                if (parsingTasks) {
+                    const task = parsingTasks.find(t => t.id === editingTaskId);
+                    if (task && task.status === 'success' && task.result) {
+                        setUrl(task.url);
+                        setPlatform(detectPlatform(task.url));
+                        setParsedRecipe(task.result);
+                        setEditableRecipe(JSON.parse(JSON.stringify(task.result)));
+                        setParseStatus('success');
+                    }
+                }
+            } else {
+                // New Mode: Reset everything
+                setUrl('');
+                setPlatform('unknown');
+                setParseStatus('idle');
+                setParsedRecipe(null);
+                setEditableRecipe(null);
+                setErrorMessage('');
+            }
+        }
+
+        // Update refs
+        prevIsOpenRef.current = isOpen;
+        prevEditingIdRef.current = editingTaskId || null;
+    }, [isOpen, editingTaskId]); // Removed parsingTasks dependency for RESET logic
+
+    // Effect 2: Update data when background task parsing completes (Only in Edit Mode)
     React.useEffect(() => {
         if (isOpen && editingTaskId && parsingTasks) {
             const task = parsingTasks.find(t => t.id === editingTaskId);
             if (task && task.status === 'success' && task.result) {
-                setUrl(task.url);
-                setPlatform(detectPlatform(task.url));
-                setParsedRecipe(task.result);
-                setEditableRecipe(JSON.parse(JSON.stringify(task.result)));
-                setParseStatus('success');
+                // Only update if we don't have data yet or if it's a fresh success
+                // For now, simpler: just sync if we are in view mode for that task
+                if (!editableRecipe) {
+                    setUrl(task.url);
+                    setPlatform(detectPlatform(task.url));
+                    setParsedRecipe(task.result);
+                    setEditableRecipe(JSON.parse(JSON.stringify(task.result)));
+                    setParseStatus('success');
+                }
             }
-        } else if (isOpen && !editingTaskId) {
-            // Reset for new recipe
-            setUrl('');
-            setPlatform('unknown');
-            setParseStatus('idle');
-            setParsedRecipe(null);
-            setEditableRecipe(null);
-            setErrorMessage('');
         }
-    }, [isOpen, editingTaskId, parsingTasks]);
-
+    }, [parsingTasks, isOpen, editingTaskId]); // Keep this for updates
     const handleParse = async () => {
         if (!url.trim()) {
             setErrorMessage('请输入链接');
