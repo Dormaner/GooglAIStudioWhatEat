@@ -5,7 +5,6 @@ import cron from 'node-cron';
 import recipesRouter from './routes/recipes.js';
 import ingredientsRouter from './routes/ingredients.js';
 import searchRouter from './routes/search.js';
-import aiRouter from './routes/ai.js';
 import imageRouter from './routes/image.js';
 import shoppingCartRouter from './routes/shoppingCart.js';
 import { scrapeXiachufang } from './services/scraper.js';
