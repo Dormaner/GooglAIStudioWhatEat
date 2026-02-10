@@ -34,9 +34,9 @@ async function getBrowser(): Promise<Browser> {
             console.log('[Puppeteer] Launching in Production (Serverless Chromium)...');
             browserInstance = await puppeteer.launch({
                 args: chromium.args,
-                defaultViewport: chromium.defaultViewport,
+                defaultViewport: { width: 1280, height: 720 },
                 executablePath: await chromium.executablePath(),
-                headless: chromium.headless,
+                headless: "shell",
                 ignoreHTTPSErrors: true,
             } as any);
         } else {
