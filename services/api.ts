@@ -10,8 +10,6 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    // Force fetch adapter to ensure CapacitorHttp intercepts it
-    adapter: 'fetch',
 });
 
 // Recipe APIs
