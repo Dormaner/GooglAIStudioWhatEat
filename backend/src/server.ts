@@ -30,7 +30,10 @@ app.post('/api/scraper/trigger', async (req, res) => {
 
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: true, // Reflect request origin (allows all, including mobile app's localhost/capacitor)
+    credentials: true // Allow cookies/headers
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
