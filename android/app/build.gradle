@@ -28,6 +28,8 @@ android {
             outputFileName = "WhatEat-v${variant.versionName}.apk"
         }
     }
+
+    }
 }
 
 repositories {
