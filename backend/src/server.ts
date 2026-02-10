@@ -31,8 +31,15 @@ app.post('/api/scraper/trigger', async (req, res) => {
 
 // Middleware
 app.use(cors({
-    origin: true, // Reflect request origin (allows all, including mobile app's localhost/capacitor)
-    credentials: true // Allow cookies/headers
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        // Allow all origins (we can restrict this later if needed)
+        callback(null, true);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Api-Version']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
