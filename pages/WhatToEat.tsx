@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, RefreshCw, Loader2, Search } from 'lucide-react';
+import { Plus, RefreshCw, Loader2, Search, AlertCircle } from 'lucide-react';
 import { fetchRecipes, softDeleteRecipe } from '../services/api';
 import { Recipe } from '../types';
 import ParsingButton from '../components/ParsingButton';
 import SaveRecipeModal from '../components/SaveRecipeModal';
 import { supabase } from '../config/supabase';
 import { API_BASE_URL } from '../constants/config';
+import { useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 
 interface WhatToEatProps {
   onRecipeClick: (recipe: Recipe) => void;
@@ -182,6 +184,23 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
     <div className="px-3 pt-14 h-full flex flex-col bg-white">
       <div className="flex justify-between items-center mb-4 px-1">
         <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">吃什么</h1>
+        {/* DEBUG PANEL - TEMPORARY */}
+        {error && (
+          <div className="mx-6 mb-4 p-3 bg-red-50 rounded-xl border border-red-100">
+            <div className="flex items-center gap-2 text-red-600 mb-1">
+              <AlertCircle size={16} />
+              <span className="font-bold text-xs">Connection Error</span>
+            </div>
+            <p className="text-[10px] text-red-600 font-mono break-all">{error}</p>
+            <div className="mt-2 pt-2 border-t border-red-100 text-[10px] text-gray-500 font-mono">
+              <p>API: {API_BASE_URL}</p>
+              <p>Platform: {Capacitor.getPlatform()}</p>
+              <p>Native: {Capacitor.isNativePlatform() ? 'Yes' : 'No'}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Main Action Card */}
         <div className="flex items-center gap-2">
           {/* Parsing Button */}
           <ParsingButton
