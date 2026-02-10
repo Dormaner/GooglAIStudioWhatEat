@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, RotateCcw, Clock, Trash2 } from 'lucide-react';
 import { fetchRecycleBin, restoreRecipe } from '../services/api';
 import { Recipe } from '../types';
+import { API_BASE_URL } from '../constants/config';
 
 interface RecycleBinProps {
     onBack: () => void;
@@ -71,7 +72,7 @@ const RecycleBin: React.FC<RecycleBinProps> = ({ onBack }) => {
                     deletedRecipes.map(recipe => (
                         <div key={recipe.id} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex gap-3">
                             <div className="w-24 h-24 rounded-lg overflow-hidden shrink-0 bg-gray-100 relative">
-                                <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent(recipe.image || '')}`} alt={recipe.name} className="w-full h-full object-cover opacity-60 grayscale" />
+                                <img src={`${API_BASE_URL}/api/image?url=${encodeURIComponent(recipe.image || '')}`} alt={recipe.name} className="w-full h-full object-cover opacity-60 grayscale" />
                             </div>
                             <div className="flex-1 flex flex-col justify-between py-0.5">
                                 <div>

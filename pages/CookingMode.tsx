@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { X, Mic, Play, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Recipe, ViewMode } from '../types';
+import { API_BASE_URL } from '../constants/config';
 
 interface CookingModeProps {
   recipe: Recipe;
@@ -41,7 +42,7 @@ const CookingMode: React.FC<CookingModeProps> = ({ recipe, mode, onExit }) => {
       {/* Immersive Background */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <img
-          src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent(currentStep.image || recipe.image)}`}
+          src={`${API_BASE_URL}/api/image?url=${encodeURIComponent(currentStep.image || recipe.image)}`}
           className="w-full h-full object-cover opacity-10 blur-xl scale-110"
           alt="Backdrop"
           referrerPolicy="no-referrer"
@@ -54,7 +55,7 @@ const CookingMode: React.FC<CookingModeProps> = ({ recipe, mode, onExit }) => {
         {/* Image Container - No Aspect Ratio Lock, just Full Width */}
         <div className="relative w-full shadow-2xl">
           <img
-            src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent(currentStep.image || recipe.image)}`}
+            src={`${API_BASE_URL}/api/image?url=${encodeURIComponent(currentStep.image || recipe.image)}`}
             className="w-full h-auto object-cover max-h-[50vh] mx-auto bg-black/20"
             alt="Step illustration"
             referrerPolicy="no-referrer"

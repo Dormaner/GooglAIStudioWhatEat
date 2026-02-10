@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { Recipe } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_BASE_URL } from '../constants/config';
+
+const API_URL = API_BASE_URL;
 
 const api = axios.create({
     baseURL: API_URL,

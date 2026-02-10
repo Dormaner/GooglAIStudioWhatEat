@@ -11,6 +11,7 @@ import VariantSelectionModal from '../components/VariantSelectionModal';
 import SaveRecipeModal from '../components/SaveRecipeModal';
 import ParsingButton from '../components/ParsingButton';
 import { useBackHandler } from '../contexts/BackHandlerContext';
+import { API_BASE_URL } from '../constants/config';
 
 interface WhatIsAvailableProps {
   onRecipeClick: (recipe: Recipe) => void;
@@ -453,7 +454,7 @@ const WhatIsAvailable: React.FC<WhatIsAvailableProps> = ({
                   >
                     <div className="relative w-full aspect-video bg-gray-100">
                       <img
-                        src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent(recipe.image || '')}`}
+                        src={`${API_BASE_URL}/api/image?url=${encodeURIComponent(recipe.image || '')}`}
                         alt={recipe.name}
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Recipe } from '../../types';
+import { API_BASE_URL } from '../../constants/config';
 import { ChefHat } from 'lucide-react';
 
 interface RecipeListProps {
@@ -29,7 +30,7 @@ const RecipeList: React.FC<RecipeListProps> = ({ recipes, onRecipeClick, emptyMe
                     <div className="w-24 h-24 bg-gray-100 flex-shrink-0">
                         {recipe.image && (
                             <img
-                                src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent(recipe.image)}`}
+                                src={`${API_BASE_URL}/api/image?url=${encodeURIComponent(recipe.image)}`}
                                 alt={recipe.name}
                                 className="w-full h-full object-cover"
                                 referrerPolicy="no-referrer"

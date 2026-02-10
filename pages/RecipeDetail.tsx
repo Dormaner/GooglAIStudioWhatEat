@@ -4,6 +4,7 @@ import { ChevronLeft, Play, Heart, Star, Edit3, ShoppingCart, CookingPot, Chevro
 import { Recipe, ViewMode } from '../types';
 import { analyzeRecipe } from '../services/api';
 import { supabase } from '../config/supabase';
+import { API_BASE_URL } from '../constants/config';
 
 interface RecipeDetailProps {
   recipe: Recipe;
@@ -202,7 +203,7 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
         // We implemented DELETE /api/shopping-cart in backend
         // Let's call it directly or via api.ts
         // NOTE: api.ts doesn't have deleteFromCart yet? Wait, let's check or just fetch directly
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/shopping-cart`, {
+        const response = await fetch(`${API_BASE_URL}/api/shopping-cart`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, ingredientName })
@@ -538,7 +539,7 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
             // Bilibili Video Mode (Cover Image Only - Fix for embedding issues)
             <div className="w-full h-full relative group cursor-pointer" onClick={() => window.open(currentRecipe.link, '_blank')}>
               <img
-                src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent(currentRecipe.image || '')}`}
+                src={`${API_BASE_URL}/api/image?url=${encodeURIComponent(currentRecipe.image || '')}`}
                 className="w-full h-full object-cover"
                 alt="Video Cover"
               />
@@ -562,7 +563,7 @@ const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, mode, setMode, onBa
                 onTouchEnd={handleTouchEnd}
               >
                 <img
-                  src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent((currentStep?.image || currentRecipe.image) || '')}`}
+                  src={`${API_BASE_URL}/api/image?url=${encodeURIComponent((currentStep?.image || currentRecipe.image) || '')}`}
                   className="w-full h-auto object-contain block transition-opacity duration-300"
                   alt="Step Preview"
                   referrerPolicy="no-referrer"

@@ -6,6 +6,7 @@ import { Recipe } from '../types';
 import ParsingButton from '../components/ParsingButton';
 import SaveRecipeModal from '../components/SaveRecipeModal';
 import { supabase } from '../config/supabase';
+import { API_BASE_URL } from '../constants/config';
 
 interface WhatToEatProps {
   onRecipeClick: (recipe: Recipe) => void;
@@ -278,7 +279,7 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
               )}
 
               <div className={`relative w-full aspect-square rounded-[1.2rem] overflow-hidden mb-1 bg-[#fdf2e9] border-[1.5px] transition-all ${recipe.id === '5' ? 'border-blue-400 shadow-sm scale-105' : 'border-transparent'}`}>
-                <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/image?url=${encodeURIComponent(recipe.image || '')}`} alt={recipe.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <img src={`${API_BASE_URL}/api/image?url=${encodeURIComponent(recipe.image || '')}`} alt={recipe.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 {recipe.missingIngredients && recipe.missingIngredients.length > 0 ? (
                   <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] py-0.5 px-0.5 text-center truncate">
                     缺:{recipe.missingIngredients[0]}
