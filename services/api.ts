@@ -14,8 +14,17 @@ const api = axios.create({
 
 // Recipe APIs
 export const fetchRecipes = async (): Promise<Recipe[]> => {
-    const response = await api.get('/api/recipes');
-    return response.data;
+    try {
+        const response = await api.get('/api/recipes');
+        return response.data;
+    } catch (error: any) {
+        console.error('Fetch Recipes Error:', error);
+        // Enhance error message for debugging
+        if (error.message === 'Network Error') {
+            throw new Error(`Network Error: ${error.code || 'Unknown'} - Check SSL/CORS`);
+        }
+        throw error;
+    }
 };
 
 export const fetchRecipeById = async (id: string, name?: string, userId?: string): Promise<Recipe> => {

@@ -191,11 +191,15 @@ const WhatToEat: React.FC<WhatToEatProps> = ({
               <AlertCircle size={16} />
               <span className="font-bold text-xs">Connection Error</span>
             </div>
-            <p className="text-[10px] text-red-600 font-mono break-all">{error}</p>
+            <p className="text-[10px] text-red-600 font-mono break-all font-bold">{error}</p>
             <div className="mt-2 pt-2 border-t border-red-100 text-[10px] text-gray-500 font-mono">
               <p>API: {API_BASE_URL}</p>
               <p>Platform: {Capacitor.getPlatform()}</p>
               <p>Native: {Capacitor.isNativePlatform() ? 'Yes' : 'No'}</p>
+              {/* Tips for common errors */}
+              {error?.includes('Network Error') && (
+                <p className="mt-1 text-orange-600">Possible: SSL/CORS/Offline</p>
+              )}
             </div>
           </div>
         )}
